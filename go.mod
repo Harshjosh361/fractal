@@ -1,9 +1,11 @@
 module github.com/SkySingh04/fractal
 
-
 go 1.22.2
 
-require gofr.dev v1.27.1
+require (
+	gofr.dev v1.27.1
+	gopkg.in/yaml.v2 v2.4.0
+)
 
 require (
 	cloud.google.com/go v0.116.0 // indirect
@@ -57,7 +59,6 @@ require (
 	github.com/redis/go-redis/v9 v9.7.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/segmentio/kafka-go v0.4.47 // indirect
-	github.com/streadway/amqp v1.1.0
 	github.com/stretchr/testify v1.9.0 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.54.0 // indirect

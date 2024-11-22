@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/example/controller"
+	"github.com/SkySingh04/fractal/controller"
 	"gofr.dev/pkg/gofr"
 )
 
