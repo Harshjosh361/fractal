@@ -9,7 +9,16 @@ import (
 )
 
 // KafkaSource implements the DataSource interface
-type KafkaSource struct{}
+type KafkaSource struct {
+	ConsumerURL   string `json:"consumer_url"`
+	ConsumerTopic string `json:"consumer_topic"`
+}
+
+// KafkaDestination implements the DataDestination interface
+type KafkaDestination struct {
+	ProducerURL   string `json:"producer_url"`
+	ProducerTopic string `json:"producer_topic"`
+}
 
 // FetchData fetches data from Kafka
 func (k KafkaSource) FetchData(req interfaces.Request) (interface{}, error) {
@@ -20,9 +29,6 @@ func (k KafkaSource) FetchData(req interfaces.Request) (interface{}, error) {
 	// Your Kafka fetch logic here
 	return "KafkaData", nil
 }
-
-// KafkaDestination implements the DataDestination interface
-type KafkaDestination struct{}
 
 // SendData sends data to Kafka
 func (k KafkaDestination) SendData(data interface{}, req interfaces.Request) error {

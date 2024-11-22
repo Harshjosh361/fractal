@@ -1,12 +1,13 @@
 package config
 
 import (
+	"errors"
 	"fmt"
+	"reflect"
 
+	"github.com/SkySingh04/fractal/registry"
 	"github.com/manifoldco/promptui"
 	"github.com/spf13/viper"
-	"github.com/SkySingh04/fractal/registry"
-	
 )
 
 // AskForMode prompts the user to select between starting the HTTP server or using the CLI
@@ -39,8 +40,9 @@ func LoadConfig(configFile string) (map[string]string, error) {
 	return config, nil
 }
 
-// SetupConfigInteractively prompts the user to set up input and output methods interactively
-func SetupConfigInteractively() (map[string]string, error) {
+// SetupConfigInteractively prompts the user to set up input and output methods interactively,
+// including all required fields for the selected integrations.
+func SetupConfigInteractively() (map[string]interface{}, error) {
 	// Dynamically retrieve registered input and output options
 	inputMethods := getRegisteredDataSources()
 	outputMethods := getRegisteredDataDestinations()
@@ -55,6 +57,12 @@ func SetupConfigInteractively() (map[string]string, error) {
 		return nil, fmt.Errorf("failed to get input method: %w", err)
 	}
 
+	// Read additional fields for the input method
+	inputConfig, err := readIntegrationFields(inputMethod, true)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get fields for input method: %w", err)
+	}
+
 	// Prompt for Output Method
 	outputPrompt := promptui.Select{
 		Label: "Select Output Method",
@@ -65,16 +73,84 @@ func SetupConfigInteractively() (map[string]string, error) {
 		return nil, fmt.Errorf("failed to get output method: %w", err)
 	}
 
-	// Save user selections to the config
-	config := map[string]string{
+	// Read additional fields for the output method
+	outputConfig, err := readIntegrationFields(outputMethod, false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get fields for output method: %w", err)
+	}
+
+	// Combine all configurations
+	config := map[string]interface{}{
 		"inputMethod":  inputMethod,
 		"outputMethod": outputMethod,
+		"inputConfig":  inputConfig,
+		"outputConfig": outputConfig,
 	}
 
 	// Optionally save the config to a file for future runs
 	saveConfig(config)
 
 	return config, nil
+}
+
+// readIntegrationFields dynamically prompts for and reads all fields in the selected integration struct
+func readIntegrationFields(method string, isSource bool) (map[string]interface{}, error) {
+	var integration interface{}
+	var found bool
+
+	// Get the appropriate integration
+	if isSource {
+		integration, found = registry.GetSource(method)
+	} else {
+		integration, found = registry.GetDestination(method)
+	}
+
+	if !found {
+		return nil, errors.New("integration not found in registry")
+	}
+
+	// Use reflection to inspect the integration struct
+	val := reflect.ValueOf(integration)
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem() // Dereference if it's a pointer
+	}
+	if val.Kind() != reflect.Struct {
+		return nil, errors.New("integration is not a struct")
+	}
+
+	config := make(map[string]interface{})
+	for i := 0; i < val.NumField(); i++ {
+		field := val.Type().Field(i)
+		fieldName := field.Name
+		fieldType := field.Type
+
+		// Prompt the user for the field value
+		prompt := promptui.Prompt{
+			Label: fmt.Sprintf("Enter %s (%s)", fieldName, fieldType),
+		}
+		value, err := prompt.Run()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get value for field %s: %w", fieldName, err)
+		}
+
+		// Assign the value to the config
+		config[fieldName] = value
+	}
+
+	return config, nil
+}
+
+// saveConfig writes the configuration to a config.yaml file
+func saveConfig(config map[string]interface{}) {
+	for key, value := range config {
+		viper.Set(key, value)
+	}
+
+	if err := viper.WriteConfigAs("config.yaml"); err != nil {
+		fmt.Println("Failed to save configuration:", err)
+	} else {
+		fmt.Println("Configuration saved to config.yaml")
+	}
 }
 
 // Helper function to retrieve registered input methods
@@ -93,16 +169,4 @@ func getRegisteredDataDestinations() []string {
 		destinations = append(destinations, dest)
 	}
 	return destinations
-}
-
-// saveConfig writes the configuration to a config.yaml file
-func saveConfig(config map[string]string) {
-	viper.Set("inputMethod", config["inputMethod"])
-	viper.Set("outputMethod", config["outputMethod"])
-
-	if err := viper.WriteConfigAs("config.yaml"); err != nil {
-		fmt.Println("Failed to save configuration:", err)
-	} else {
-		fmt.Println("Configuration saved to config.yaml")
-	}
 }

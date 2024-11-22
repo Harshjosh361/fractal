@@ -5,8 +5,8 @@ import (
 
 	"github.com/SkySingh04/fractal/config"
 	"github.com/SkySingh04/fractal/controller"
+	_ "github.com/SkySingh04/fractal/integrations"
 	"gofr.dev/pkg/gofr"
-	  _ "github.com/SkySingh04/fractal/integrations"
 )
 
 const (
@@ -48,7 +48,18 @@ func main() {
 		configuration, err := config.LoadConfig("config.yaml")
 		if err != nil {
 			app.Logger().Logf("Config file not found. Let's set up the input and output methods.")
-			configuration, err = config.SetupConfigInteractively()
+			configMap, err := config.SetupConfigInteractively()
+			if err != nil {
+				app.Logger().Fatalf("Failed to set up configuration: %v", err)
+			}
+			configuration = make(map[string]string)
+			for key, value := range configMap {
+				if strValue, ok := value.(string); ok {
+					configuration[key] = strValue
+				} else {
+					app.Logger().Fatalf("Invalid configuration value for key %s: %v", key, value)
+				}
+			}
 			if err != nil {
 				app.Logger().Fatalf("Failed to set up configuration: %v", err)
 			}
