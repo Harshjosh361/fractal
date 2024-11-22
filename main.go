@@ -6,6 +6,7 @@ import (
 	"github.com/SkySingh04/fractal/config"
 	"github.com/SkySingh04/fractal/controller"
 	"gofr.dev/pkg/gofr"
+	  _ "github.com/SkySingh04/fractal/integrations"
 )
 
 const (

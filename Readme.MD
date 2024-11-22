@@ -1,6 +1,73 @@
 # Fractal
 
 **Fractal** is a flexible, configurable data processing tool built with **GoFr** and **Golang**. Fractal is designed to handle data ingestion from multiple sources, apply powerful transformations and validations, and deliver output to a wide range of destinations. With Fractal, you can automate complex data workflows without needing to manage low-level details.
+Here's the documentation for setting up a new integration in your project:
+
+
+# Adding a New Integration
+
+The system is designed to make it simple to add new data integrations for both input and output. Each integration should define methods to read (input) and write (output) data, following a unified interface approach.
+
+## Steps to Add a New Integration
+
+1. **Create a New File**:  
+   In the `integrations` directory, create a new file named after the integration. For example, if adding support for RabbitMQ, create `rabbitmq.go`.
+
+2. **Implement the `Source` and `Destination` Interfaces**:  
+   In this file, you need to define structs that implement the `Source` and `Destination` interfaces.
+
+   - **Source Interface**: This interface should define the `Read` method, which reads data from the input source and returns it in a standardized format.
+   - **Destination Interface**: This interface should define the `Write` method, which writes data to the output destination.
+
+   Here's an example structure for `rabbitmq.go`:
+
+   ```go
+   package integrations
+
+   import "fmt"
+
+   // RabbitMQInput struct to handle input from RabbitMQ
+   type RabbitMQInput struct {
+       // Add any necessary fields, such as connection settings, queues, etc.
+   }
+
+   // Read method to read from RabbitMQ
+   func (r *RabbitMQInput) Read() (interface{}, error) {
+       // Implement logic to read from RabbitMQ
+       fmt.Println("Reading from RabbitMQ...")
+       return nil, nil
+   }
+
+   // RabbitMQOutput struct to handle output to RabbitMQ
+   type RabbitMQOutput struct {
+       // Add any necessary fields, such as connection settings, queues, etc.
+   }
+
+   // Write method to write to RabbitMQ
+   func (r *RabbitMQOutput) Write(data interface{}) error {
+       // Implement logic to write to RabbitMQ
+       fmt.Println("Writing to RabbitMQ...")
+       return nil
+   }
+
+   // Initialize the new integration
+   func init() {
+       RegisterSource("rabbitmq", &RabbitMQInput{})
+       RegisterDestination("rabbitmq", &RabbitMQOutput{})
+   }
+   ```
+
+3. **Register the Integration**:  
+   In the `init()` function, use `RegisterSource` and `RegisterDestination` to add the integration to the system. This makes it available for both CLI and HTTP server modes.
+
+4. **Configuration**:  
+   If the integration requires additional configuration (like credentials or connection strings), make sure to add relevant fields to the struct and include a way to parse this information from the user-provided configuration.
+
+5. **Testing the Integration**:  
+   Run the application and select the new integration in either CLI or HTTP mode. Verify that data can be read from and written to the integration correctly.
+
+
+With this setup, adding integrations is straightforward. Each integration can now be quickly defined and registered, keeping your system scalable and modular.
 
 ## Features
 - **Multi-Source Data Ingestion**: Supports data ingestion from HTTP, CSV files, SQL databases, Pub-Sub systems, cloud storage, and more.

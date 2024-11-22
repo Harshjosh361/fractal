@@ -5,6 +5,8 @@ import (
 
 	"github.com/manifoldco/promptui"
 	"github.com/spf13/viper"
+	"github.com/SkySingh04/fractal/registry"
+	
 )
 
 // AskForMode prompts the user to select between starting the HTTP server or using the CLI
@@ -39,12 +41,15 @@ func LoadConfig(configFile string) (map[string]string, error) {
 
 // SetupConfigInteractively prompts the user to set up input and output methods interactively
 func SetupConfigInteractively() (map[string]string, error) {
+	// Dynamically retrieve registered input and output options
+	inputMethods := getRegisteredDataSources()
+	outputMethods := getRegisteredDataDestinations()
+
 	// Prompt for Input Method
 	inputPrompt := promptui.Select{
 		Label: "Select Input Method",
-		Items: []string{"CSV", "SQL Database", "Kafka Queue", "Cloud Storage"},
+		Items: inputMethods,
 	}
-
 	_, inputMethod, err := inputPrompt.Run()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get input method: %w", err)
@@ -53,9 +58,8 @@ func SetupConfigInteractively() (map[string]string, error) {
 	// Prompt for Output Method
 	outputPrompt := promptui.Select{
 		Label: "Select Output Method",
-		Items: []string{"SQL Database", "NoSQL Database", "CSV Output", "Kafka Queue", "Cloud Storage"},
+		Items: outputMethods,
 	}
-
 	_, outputMethod, err := outputPrompt.Run()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get output method: %w", err)
@@ -71,6 +75,24 @@ func SetupConfigInteractively() (map[string]string, error) {
 	saveConfig(config)
 
 	return config, nil
+}
+
+// Helper function to retrieve registered input methods
+func getRegisteredDataSources() []string {
+	var sources []string
+	for source := range registry.GetSources() {
+		sources = append(sources, source)
+	}
+	return sources
+}
+
+// Helper function to retrieve registered output methods
+func getRegisteredDataDestinations() []string {
+	var destinations []string
+	for dest := range registry.GetDestinations() {
+		destinations = append(destinations, dest)
+	}
+	return destinations
 }
 
 // saveConfig writes the configuration to a config.yaml file
