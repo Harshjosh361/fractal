@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/SkySingh04/fractal/interfaces"
 	"github.com/SkySingh04/fractal/logger"
@@ -83,59 +84,70 @@ func (d DynamoDBSource) FetchData(req interfaces.Request) (interface{}, error) {
 		return nil, errors.New("no data retrieved from DynamoDB")
 	}
 
-	// Process and transform items
+	// Create channels for concurrency
+	dataChannel := make(chan map[string]interface{}, len(result.Items))
+	errorChannel := make(chan error, len(result.Items))
+	var wg sync.WaitGroup
+
+	// Process and transform items concurrently using goroutines
 	for _, item := range result.Items {
-		// Validate data
-		validatedData, err := validateDynamoDBData(item)
-		if err != nil {
-			logger.Errorf("Validation failed for item: %v, Error: %s", item, err)
-			continue
-		}
+		wg.Add(1)
+		go func(item map[string]*dynamodb.AttributeValue) {
+			defer wg.Done()
 
-		// Transform data
-		transformedData := transformDynamoDBData(validatedData)
-
-		// Convert transformed data (map[string]*dynamodb.AttributeValue) to map[string]interface{}
-		interfaceData := make(map[string]interface{})
-		for key, value := range transformedData {
-			if value.S != nil {
-				interfaceData[key] = *value.S
-			} else if value.N != nil {
-				interfaceData[key] = *value.N
-			} else if value.BOOL != nil {
-				interfaceData[key] = *value.BOOL
+			// Validate data
+			validatedData, err := validateDynamoDBData(item)
+			if err != nil {
+				errorChannel <- fmt.Errorf("validation failed for item: %v, Error: %s", item, err)
+				return
 			}
-			// Add more types as necessary
-		}
 
-		logger.Infof("Item successfully processed: %v", interfaceData)
-		return interfaceData, nil
+			// Transform data
+			transformedData := transformDynamoDBData(validatedData)
+
+			// Convert transformed data (map[string]*dynamodb.AttributeValue) to map[string]interface{}
+			interfaceData := make(map[string]interface{})
+			for key, value := range transformedData {
+				if value.S != nil {
+					interfaceData[key] = *value.S
+				} else if value.N != nil {
+					interfaceData[key] = *value.N
+				} else if value.BOOL != nil {
+					interfaceData[key] = *value.BOOL
+				}
+			}
+
+			// Send processed data to the channel
+			dataChannel <- interfaceData
+		}(item)
 	}
 
-	return nil, errors.New("no valid data processed from DynamoDB")
+	// Wait for all goroutines to finish
+	wg.Wait()
+
+	// Close channels after processing
+	close(dataChannel)
+	close(errorChannel)
+
+	// Check for errors
+	if len(errorChannel) > 0 {
+		return nil, <-errorChannel
+	}
+
+	// Collect and return the processed data
+	var processedData []map[string]interface{}
+	for data := range dataChannel {
+		processedData = append(processedData, data)
+	}
+
+	if len(processedData) == 0 {
+		return nil, errors.New("no valid data processed from DynamoDB")
+	}
+
+	return processedData, nil
 }
 
 // SendData writes data to the target DynamoDB table in the specified region.
-
-// prepareDynamoDBItem converts a map[string]interface{} to a map[string]*dynamodb.AttributeValue
-func prepareDynamoDBItem(data map[string]interface{}) (map[string]*dynamodb.AttributeValue, error) {
-	// Convert the map to a DynamoDB-compatible item
-	item := make(map[string]*dynamodb.AttributeValue)
-	for k, v := range data {
-		switch v := v.(type) {
-		case string:
-			item[k] = &dynamodb.AttributeValue{S: aws.String(v)}
-		case int, int64:
-			item[k] = &dynamodb.AttributeValue{N: aws.String(fmt.Sprintf("%v", v))}
-		case bool:
-			item[k] = &dynamodb.AttributeValue{BOOL: aws.Bool(v)}
-		default:
-			return nil, fmt.Errorf("unsupported attribute type for key '%s'", k)
-		}
-	}
-
-	return item, nil
-}
 func (d DynamoDBDestination) SendData(data interface{}, req interfaces.Request) error {
 	logger.Infof("Connecting to DynamoDB Destination: Table=%s, Region=%s", req.DynamoDBTargetTable, req.DynamoDBTargetRegion)
 
@@ -181,6 +193,26 @@ func (d DynamoDBDestination) SendData(data interface{}, req interfaces.Request) 
 
 	logger.Infof("Data successfully written to DynamoDB table %s: %v", req.DynamoDBTargetTable, data)
 	return nil
+}
+
+// prepareDynamoDBItem converts a map[string]interface{} to a map[string]*dynamodb.AttributeValue
+func prepareDynamoDBItem(data map[string]interface{}) (map[string]*dynamodb.AttributeValue, error) {
+	// Convert the map to a DynamoDB-compatible item
+	item := make(map[string]*dynamodb.AttributeValue)
+	for k, v := range data {
+		switch v := v.(type) {
+		case string:
+			item[k] = &dynamodb.AttributeValue{S: aws.String(v)}
+		case int, int64:
+			item[k] = &dynamodb.AttributeValue{N: aws.String(fmt.Sprintf("%v", v))}
+		case bool:
+			item[k] = &dynamodb.AttributeValue{BOOL: aws.Bool(v)}
+		default:
+			return nil, fmt.Errorf("unsupported attribute type for key '%s'", k)
+		}
+	}
+
+	return item, nil
 }
 
 // validateDynamoDBData ensures the input DynamoDB data meets required criteria.

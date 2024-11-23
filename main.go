@@ -14,13 +14,14 @@ import (
 
 const (
 	logo = `
- ______ _____            _____ _______       _      
- |  ____|  __ \     /\   / ____|__   __|/\   | |     
- | |__  | |__) |   /  \ | |       | |  /  \  | |     
- |  __| |  _  /   / /\ \| |       | | / /\ \ | |     
- | |    | | \ \  / ____ \ |____   | |/ ____ \| |____ 
- |_|    |_|  \_\/_/    \_\_____|  |_/_/    \_\______|
-`
+
+	███████╗██████╗  █████╗  ██████╗████████╗ █████╗ ██╗     
+	██╔════╝██╔══██╗██╔══██╗██╔════╝╚══██╔══╝██╔══██╗██║     
+	█████╗  ██████╔╝███████║██║        ██║   ███████║██║     
+	██╔══╝  ██╔══██╗██╔══██║██║        ██║   ██╔══██║██║     
+	██║     ██║  ██║██║  ██║╚██████╗   ██║   ██║  ██║███████╗
+	╚═╝     ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝
+	`
 )
 
 func main() {
@@ -171,8 +172,8 @@ func mapConfigToRequest(config map[string]interface{}) interfaces.Request {
 		SFTPPassword:            getStringField(config, "password", ""),
 		WebSocketSourceURL:      getStringField(config, "url", ""),
 		WebSocketDestURL:        getStringField(config, "url", ""),
-		CredentialFileAddr: 	 getStringField(config, "credentialfileaddr", "firebaseConfig.json"),
-		Document: 			 	 getStringField(config, "document", "sampledata"),
-		Collection: 		 	 getStringField(config, "collection", "1"),
+		CredentialFileAddr:      getStringField(config, "credentialfileaddr", "firebaseConfig.json"),
+		Document:                getStringField(config, "document", "sampledata"),
+		Collection:              getStringField(config, "collection", "1"),
 	}
 }

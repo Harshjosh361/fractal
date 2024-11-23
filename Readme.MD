@@ -3,7 +3,179 @@
 **Fractal** is a flexible, configurable data processing tool built with **GoFr** and **Golang**. Fractal is designed to handle data ingestion from multiple sources, apply powerful transformations and validations, and deliver output to a wide range of destinations. With Fractal, you can automate complex data workflows without needing to manage low-level details.
 Here's the documentation for setting up a new integration in your project:
 
-## To Run RabbitMQ :  ```bash docker run -d --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3-management```
+### **Custom Syntax Documentation for Validation and Transformation Rules**
+
+## **1. Overview**
+
+The custom syntax enables users to:
+1. Validate incoming data to ensure it meets predefined conditions.
+2. Transform data fields to fit desired formats, structures, or requirements.
+3. Define flexible error-handling strategies for data processing pipelines.
+
+Rules can be written for any data source or destination, such as **JSON**, **YAML**, **CSV**, **SQL Databases**, **Message Brokers**, or **Cloud Services**.
+
+---
+
+## **2. Validation Rules**
+
+Validation rules ensure that data meets specific quality and integrity requirements. 
+
+### **Syntax**
+```custom
+FIELD(<field_name>) <validation_condition>
+```
+
+### **Validation Conditions**
+
+| Condition         | Description                                                                                     | Example                                                                                                                                 |
+|--------------------|-------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------|
+| `TYPE(<data_type>)` | Ensures the field is of a specified type. Data types: `STRING`, `INT`, `FLOAT`, `BOOL`, `DATE`. | `FIELD("age") TYPE(INT)`                                                                                                               |
+| `RANGE(<min>, <max>)` | Ensures the field's value is within a specified range.                                         | `FIELD("price") RANGE(0, 1000)`                                                                                                        |
+| `MATCHES(<regex>)`  | Validates that the field's value matches a regular expression pattern.                          | `FIELD("email") MATCHES(EMAIL_REGEX)`                                                                                                  |
+| `IN(<value_list>)`   | Validates that the field's value is one of the specified values.                                | `FIELD("status") IN ("active", "inactive")`                                                                                           |
+| `REQUIRED`          | Ensures the field is present.                                                                  | `FIELD("name") REQUIRED`                                                                                                              |
+
+### **Examples**
+1. Validate that the field `age` is an integer and between 18 and 65:
+   ```custom
+   FIELD("age") TYPE(INT) RANGE(18, 65)
+   ```
+
+2. Ensure `email` matches a regex pattern for valid email addresses:
+   ```custom
+   FIELD("email") MATCHES(EMAIL_REGEX)
+   ```
+
+3. Check that `status` is either "active" or "inactive":
+   ```custom
+   FIELD("status") IN ("active", "inactive")
+   ```
+
+4. Make the `id` field mandatory:
+   ```custom
+   FIELD("id") REQUIRED
+   ```
+
+---
+
+## **3. Transformation Rules**
+
+Transformation rules modify or enrich data to meet specific requirements.
+
+### **Syntax**
+```custom
+<operation>
+```
+
+### **Supported Operations**
+
+| Operation                     | Description                                                                                                                                                       | Example                                                                                                                                         |
+|--------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------|
+| `RENAME(<old_field>, <new_field>)` | Renames a field in the data.                                                                                                                                      | `RENAME("old_field", "new_field")`                                                                                                             |
+| `MAP(<field_name>, {<mapping>})`  | Maps values in a field to new values using a key-value pair mapping.                                                                                             | `MAP("status", {"0": "inactive", "1": "active"})`                                                                                              |
+| `ADD_FIELD(<field_name>, <value>)`| Adds a new field with a specified value.                                                                                                                         | `ADD_FIELD("timestamp", CURRENT_TIME())`                                                                                                       |
+| `IF <condition> THEN <operation>`| Applies a transformation based on a condition.                                                                                                                  | `IF FIELD("age") > 50 THEN ADD_FIELD("senior_discount", TRUE)`                                                                                 |
+
+### **Examples**
+1. Rename a field `old_field` to `new_field`:
+   ```custom
+   RENAME("old_field", "new_field")
+   ```
+
+2. Map values in the `status` field:
+   ```custom
+   MAP("status", {"0": "inactive", "1": "active"})
+   ```
+
+3. Add a field `processed_at` with the current timestamp:
+   ```custom
+   ADD_FIELD("processed_at", CURRENT_TIME())
+   ```
+
+4. Conditionally add a senior discount for users above 50:
+   ```custom
+   IF FIELD("age") > 50 THEN ADD_FIELD("senior_discount", TRUE)
+   ```
+
+---
+
+## **4. Error Handling**
+
+Error handling defines how the system reacts when a validation or transformation fails.
+
+### **Syntax**
+```custom
+ON_ERROR(<action>)
+```
+
+### **Supported Actions**
+
+| Action               | Description                                                                                   | Example                    |
+|-----------------------|-----------------------------------------------------------------------------------------------|----------------------------|
+| `LOG_AND_CONTINUE`     | Logs the error and continues processing the next record.                                      | `ON_ERROR(LOG_AND_CONTINUE)`|
+| `STOP`                | Stops the entire pipeline on encountering an error.                                           | `ON_ERROR(STOP)`           |
+| `RETRY`              | Attempts to retry processing the failed record.                                               | `ON_ERROR(RETRY)`          |
+| `SEND_TO_QUARANTINE`   | Sends the failed record to a quarantine output for further analysis.                          | `ON_ERROR(SEND_TO_QUARANTINE)`|
+
+### **Examples**
+1. Log the error and continue processing:
+   ```custom
+   ON_ERROR(LOG_AND_CONTINUE)
+   ```
+
+2. Stop the pipeline if an error occurs:
+   ```custom
+   ON_ERROR(STOP)
+   ```
+
+---
+
+## **5. Integration-Specific Features**
+
+### **Field Naming**
+
+Depending on the data source, fields can be named using:
+1. **JSON Paths:** For JSON/YAML data.
+   ```custom
+   FIELD("$.user.age") TYPE(INT)
+   ```
+2. **Column Names:** For CSV or SQL tables.
+   ```custom
+   FIELD("Column1") TYPE(FLOAT)
+   ```
+3. **Message Keys/Values:** For Kafka or RabbitMQ.
+   ```custom
+   FIELD("$.message.key") MATCHES(KEY_REGEX)
+   ```
+
+---
+
+## **6. Unified YAML Configuration**
+
+The rules can be embedded into the YAML configuration for pipelines:
+
+```yaml
+pipeline:
+  - name: "CSV to Firebase Pipeline"
+    input:
+      type: "CSV"
+      source: "/data/input.csv"
+    validation:
+      rules: |
+        FIELD("age") TYPE(INT) RANGE(18, 65)
+        FIELD("email") MATCHES(EMAIL_REGEX)
+    transformation:
+      rules: |
+        RENAME("old_field", "new_field")
+        IF FIELD("age") > 50 THEN ADD_FIELD("senior_discount", TRUE)
+    output:
+      type: "Firebase"
+      destination: "firebase://project_name/collection"
+    error_handling: |
+      ON_ERROR(LOG_AND_CONTINUE)
+```
+
+---
 
 # Adding a New Integration
 

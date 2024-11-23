@@ -100,33 +100,71 @@ func (p PostgreSQLSource) FetchData(req interfaces.Request) (interface{}, error)
 	return allResults, nil
 }
 
-// EnsureTableExists checks if a table exists and creates it if it doesn't.
-func EnsureTableExists(db *sql.DB, tableName string, row map[string]interface{}) error {
-	// Check if table exists
-	checkQuery := fmt.Sprintf("SELECT to_regclass('public.%s')", tableName)
-	var tableExists sql.NullString
-	err := db.QueryRow(checkQuery).Scan(&tableExists)
-	if err != nil {
-		return err
-	}
+// EnsureTableExistsWorker processes table creation tasks.
+func EnsureTableExistsWorker(db *sql.DB, tasks chan map[string]interface{}, errorsChan chan error, done chan bool) {
+	for task := range tasks {
+		tableName := task["tableName"].(string)
+		row := task["row"].(map[string]interface{})
 
-	// If table does not exist, create it
-	if !tableExists.Valid {
-		var columns []string
-		for colName, value := range row {
-			colType := "TEXT" // Default to TEXT type
-			switch value.(type) {
-			case int, int32, int64:
-				colType = "INTEGER"
-			case float32, float64:
-				colType = "FLOAT"
-			case bool:
-				colType = "BOOLEAN"
-			}
-			columns = append(columns, fmt.Sprintf("%s %s", colName, colType))
+		// Check if table exists
+		checkQuery := fmt.Sprintf("SELECT to_regclass('public.%s')", tableName)
+		var tableExists sql.NullString
+		err := db.QueryRow(checkQuery).Scan(&tableExists)
+		if err != nil {
+			errorsChan <- err
+			continue
 		}
-		createQuery := fmt.Sprintf("CREATE TABLE %s (%s)", tableName, strings.Join(columns, ", "))
-		if _, err := db.Exec(createQuery); err != nil {
+
+		// If table does not exist, create it
+		if !tableExists.Valid {
+			var columns []string
+			for colName, value := range row {
+				colType := "TEXT" // Default to TEXT type
+				switch value.(type) {
+				case int, int32, int64:
+					colType = "INTEGER"
+				case float32, float64:
+					colType = "FLOAT"
+				case bool:
+					colType = "BOOLEAN"
+				}
+				columns = append(columns, fmt.Sprintf("%s %s", colName, colType))
+			}
+			createQuery := fmt.Sprintf("CREATE TABLE %s (%s)", tableName, strings.Join(columns, ", "))
+			if _, err := db.Exec(createQuery); err != nil {
+				errorsChan <- err
+				continue
+			}
+		}
+		errorsChan <- nil // Indicate success
+	}
+	done <- true
+}
+
+// EnsureTableExists enqueues table creation tasks and processes them concurrently.
+func EnsureTableExists(db *sql.DB, tableName string, row map[string]interface{}) error {
+	// Buffered channels to queue tasks and capture errors
+	tasks := make(chan map[string]interface{}, 1)
+	errorsChan := make(chan error, 1)
+	done := make(chan bool)
+
+	// Start a worker goroutine
+	go EnsureTableExistsWorker(db, tasks, errorsChan, done)
+
+	// Enqueue the task
+	tasks <- map[string]interface{}{
+		"tableName": tableName,
+		"row":       row,
+	}
+	close(tasks) // Signal no more tasks
+
+	// Wait for the worker to finish and check for errors
+	<-done
+	close(errorsChan)
+
+	// Collect any errors
+	for err := range errorsChan {
+		if err != nil {
 			return err
 		}
 	}

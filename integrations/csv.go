@@ -3,8 +3,10 @@ package integrations
 import (
 	"encoding/csv"
 	"errors"
+	"io"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/SkySingh04/fractal/interfaces"
 	"github.com/SkySingh04/fractal/logger"
@@ -64,7 +66,7 @@ type CSVDestination struct {
 	CSVDestinationFileName string `json:"csv_destination_file_name"`
 }
 
-// FetchData connects to CSV, retrieves data, and passes it through validation and transformation pipelines.
+// FetchData connects to CSV, retrieves data, and processes it concurrently.
 func (r CSVSource) FetchData(req interfaces.Request) (interface{}, error) {
 	logger.Infof("Reading data from CSV Source: %s", req.CSVSourceFileName)
 
@@ -72,28 +74,69 @@ func (r CSVSource) FetchData(req interfaces.Request) (interface{}, error) {
 		return nil, errors.New("missing CSV source file name")
 	}
 
-	// Read data from CSV
-	data, err := ReadCSV(req.CSVSourceFileName)
-	if err != nil {
+	// Create channels for processing pipeline
+	dataChan := make(chan string, bufferSize)
+	validChan := make(chan string, bufferSize)
+	transformedChan := make(chan string, bufferSize)
+	errChan := make(chan error, 1)
+
+	var wg sync.WaitGroup
+
+	// Start concurrent CSV reading
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := readCSVConcurrently(req.CSVSourceFileName, dataChan, errChan); err != nil {
+			errChan <- err
+		}
+		close(dataChan)
+	}()
+
+	// Start concurrent validation
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for data := range dataChan {
+			if validData, err := validateCSVData(data); err != nil {
+				errChan <- err
+			} else {
+				validChan <- validData
+			}
+		}
+		close(validChan)
+	}()
+
+	// Start concurrent transformation
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for validData := range validChan {
+			transformedChan <- transformCSVData(validData)
+		}
+		close(transformedChan)
+	}()
+
+	// Wait for all goroutines to finish
+	go func() {
+		wg.Wait()
+		close(errChan)
+	}()
+
+	// Collect results or errors
+	var results []string
+	for transformedData := range transformedChan {
+		results = append(results, transformedData)
+	}
+
+	// Check for errors
+	if err, ok := <-errChan; ok {
 		return nil, err
 	}
 
-	// Validate the data
-	validatedData, err := validateCSVData(data)
-	if err != nil {
-		return nil, err
-	}
-
-	// Transform the data
-	transformedData, err := transformCSVData(validatedData)
-	if err != nil {
-		return nil, err
-	}
-	return transformedData, nil
-
+	return strings.Join(results, "\n"), nil
 }
 
-// SendData connects to CSV and publishes data to the specified queue.
+// SendData writes data to a CSV file concurrently.
 func (r CSVDestination) SendData(data interface{}, req interfaces.Request) error {
 	logger.Infof("Writing data to CSV Destination: %s", req.CSVDestinationFileName)
 
@@ -101,27 +144,75 @@ func (r CSVDestination) SendData(data interface{}, req interfaces.Request) error
 		return errors.New("missing CSV destination file name")
 	}
 
-	// Write data to CSV
-	err := WriteCSV(req.CSVDestinationFileName, data.([]byte))
+	// Convert data to a slice of strings for writing
+	lines, ok := data.(string)
+	if !ok {
+		return errors.New("invalid data format for CSV destination")
+	}
+	records := strings.Split(lines, "\n")
+
+	// Write concurrently
+	errChan := make(chan error, 1)
+	go func() {
+		errChan <- writeCSVConcurrently(req.CSVDestinationFileName, records)
+	}()
+
+	// Check for errors
+	if err := <-errChan; err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// readCSVConcurrently reads the content of a CSV file and sends records to a channel.
+func readCSVConcurrently(fileName string, out chan<- string, errChan chan<- error) error {
+	file, err := os.Open(fileName)
 	if err != nil {
 		return err
+	}
+	defer file.Close()
+
+	reader := csv.NewReader(file)
+	for {
+		record, err := reader.Read()
+		if err != nil {
+			if errors.Is(err, os.ErrClosed) || errors.Is(err, io.EOF) {
+				break
+			}
+			errChan <- err
+			return err
+		}
+		out <- strings.Join(record, ",")
 	}
 	return nil
 }
 
-// Initialize the CSV integrations by registering them with the registry.
-func init() {
-	registry.RegisterSource("CSV", CSVSource{})
-	registry.RegisterDestination("CSV", CSVDestination{})
+// writeCSVConcurrently writes data records to a CSV file concurrently.
+func writeCSVConcurrently(fileName string, records []string) error {
+	file, err := os.Create(fileName)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	for _, record := range records {
+		if err := writer.Write(strings.Split(record, ",")); err != nil {
+			return err
+		}
+	}
+	writer.Flush()
+	return writer.Error()
 }
 
 // validateCSVData ensures the input data meets the required criteria.
-func validateCSVData(data []byte) ([]byte, error) {
+func validateCSVData(data string) (string, error) {
 	logger.Infof("Validating data: %s", data)
 
 	// Example: Check if data is non-empty
-	if len(data) == 0 {
-		return nil, errors.New("data is empty")
+	if strings.TrimSpace(data) == "" {
+		return "", errors.New("data is empty")
 	}
 
 	// Add custom validation logic here
@@ -129,10 +220,15 @@ func validateCSVData(data []byte) ([]byte, error) {
 }
 
 // transformCSVData modifies the input data as per business logic.
-func transformCSVData(data []byte) ([]byte, error) {
+func transformCSVData(data string) string {
 	logger.Infof("Transforming data: %s", data)
 
 	// Example: Convert data to uppercase (modify as needed)
-	transformed := []byte(strings.ToUpper(string(data)))
-	return transformed, nil
+	return strings.ToUpper(data)
+}
+
+// Initialize the CSV integrations by registering them with the registry.
+func init() {
+	registry.RegisterSource("CSV", CSVSource{})
+	registry.RegisterDestination("CSV", CSVDestination{})
 }
