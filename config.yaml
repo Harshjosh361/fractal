@@ -1,6 +1,12 @@
 inputconfig:
-    filepath: input.yaml
-inputmethod: YAML
+    ftpfilepath: /home/testuser/testfile.txt
+    password: testpass
+    url: ftp://localhost:21
+    user: testuser
+inputmethod: FTP
 outputconfig:
-    filepath: hehe.yaml
-outputmethod: YAML
+    ftpfilepath: /home/testuser/output.txt
+    password: testpass
+    url: ftp://localhost:21
+    user: testuser
+outputmethod: FTP

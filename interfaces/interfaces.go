@@ -44,14 +44,17 @@ type Request struct {
 	DynamoDBTargetTable  string `json:"dynamodb_target_table"`  // Target DynamoDB table
 	DynamoDBSourceRegion string `json:"dynamodb_source_region"` // DynamoDB source region
 	DynamoDBTargetRegion string `json:"dynamodb_target_region"` // DynamoDB target region
-	FTPURL               string `json:"ftp_url"`                // FTP URL
-	FTPUser              string `json:"ftp_user"`               // FTP user
-	FTPPassword          string `json:"ftp_password"`           // FTP password
-	SFTPURL              string `json:"sftp_url"`               // SFTP URL
-	SFTPUser             string `json:"sftp_user"`              // SFTP user
-	SFTPPassword         string `json:"sftp_password"`          // SFTP password
-	WebSocketSourceURL   string `json:"websocket_source_url"`   // WebSocket source URL
-	WebSocketDestURL     string `json:"websocket_dest_url"`     // WebSocket destination URL
+	// FTP
+	FTPFILEPATH        string `json:"ftp_file_path"`        // FTP file path
+	FTPURL             string `json:"ftp_url"`              // FTP URL
+	FTPUser            string `json:"ftp_user"`             // FTP user
+	FTPPassword        string `json:"ftp_password"`         // FTP password
+	SFTPFILEPATH       string `json:"sftp_file_path"`       // SFTP file path
+	SFTPURL            string `json:"sftp_url"`             // SFTP URL
+	SFTPUser           string `json:"sftp_user"`            // SFTP user
+	SFTPPassword       string `json:"sftp_password"`        // SFTP password
+	WebSocketSourceURL string `json:"websocket_source_url"` // WebSocket source URL
+	WebSocketDestURL   string `json:"websocket_dest_url"`   // WebSocket destination URL
 	// Firebase
 	FirebaseURL string `json:"firebase_database_url"`
 	Credential  string `json:"firebase_credential_file"`

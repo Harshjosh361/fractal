@@ -1,35 +1,13 @@
+version: '3'
 services:
-  # zookeeper:
-  #   image: confluentinc/cp-zookeeper:7.5.0
-  #   container_name: zookeeper
-  #   ports:
-  #     - "2181:2181"
-  #   environment:
-  #     ZOOKEEPER_CLIENT_PORT: 2181
-  #     ZOOKEEPER_TICK_TIME: 2000
-
-  # kafka:
-  #   image: confluentinc/cp-kafka:7.5.0
-  #   container_name: kafka
-  #   ports:
-  #     - "9092:9092"
-  #   environment:
-  #     KAFKA_BROKER_ID: 1
-  #     KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-  #     KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
-  #     KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-  #   depends_on:
-  #     - zookeeper
-
-  dynamodb:
-    image: amazon/dynamodb-local
-    container_name: dynamodb
-    ports:
-      - "8000:8000"
-    volumes:
-      - dynamodb_data:/data # Persistent storage for local DynamoDB
+  ftp-server:
+    image: stilliard/pure-ftpd
     environment:
-      AWS_REGION: us-east-1
-
-volumes:
-  dynamodb_data:
+      FTP_USER_NAME: testuser
+      FTP_USER_PASS: testpass
+      FTP_USER_HOME: /home/testuser
+    ports:
+      - "21:21"
+      - "30000-30009:30000-30009"
+    volumes:
+      - ./ftp-data:/home/testuser  # Mounts the local directory to the container
