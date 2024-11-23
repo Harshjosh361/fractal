@@ -56,7 +56,7 @@ func (d DynamoDBSource) FetchData(req interfaces.Request) (interface{}, error) {
 
 	// Handle empty result
 	if len(result.Items) == 0 {
-		logger.Warnf("No data retrieved from DynamoDB table: %s", req.DynamoDBSourceTable)
+		logger.Logf("No data retrieved from DynamoDB table: %s", req.DynamoDBSourceTable)
 		return nil, errors.New("no data retrieved from DynamoDB")
 	}
 
