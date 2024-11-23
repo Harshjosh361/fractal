@@ -57,7 +57,7 @@ require (
 	cloud.google.com/go/iam v1.2.1 // indirect
 	cloud.google.com/go/pubsub v1.45.1 // indirect
 	filippo.io/edwards25519 v1.1.0 // indirect
-	github.com/DATA-DOG/go-sqlmock v1.5.2 // indirect
+	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/XSAM/otelsql v0.34.0 // indirect
 	github.com/aws/aws-sdk-go v1.55.5
 	github.com/beorn7/perks v1.0.1 // indirect
