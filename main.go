@@ -58,11 +58,11 @@ func main() {
 			}
 			configuration = make(map[string]interface{})
 			for key, value := range configMap {
-				if strValue, ok := value.(string); ok {
-					configuration[key] = strValue
-				} else {
-					logger.Fatalf("Invalid configuration value for key %s: %v", key, value)
-				}
+				// if strValue, ok := value.(string); ok {
+				configuration[key] = value.(string)
+				// } else {
+				// 	logger.Fatalf("Invalid configuration value for key %s: %v", key, value)
+				// }
 			}
 		}
 		// logger.Infof("Configuration loaded successfully: %+v", configuration)
