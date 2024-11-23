@@ -2,7 +2,8 @@ package integrations
 
 import (
 	"errors"
-	"log"
+
+	"github.com/SkySingh04/fractal/logger"
 
 	"github.com/SkySingh04/fractal/interfaces"
 	"github.com/SkySingh04/fractal/registry"
@@ -29,7 +30,7 @@ func (s SFTPSource) FetchData(req interfaces.Request) (interface{}, error) {
 	if err := validateSFTPRequest(req, true); err != nil {
 		return nil, err
 	}
-	log.Println("Fetching data from SFTP...")
+	logger.Infof("Fetching data from SFTP...")
 	_, err := connectSFTP(req.SFTPURL, req.SFTPUser, req.SFTPPassword)
 	if err != nil {
 		return nil, err
@@ -43,7 +44,7 @@ func (s SFTPDestination) SendData(data interface{}, req interfaces.Request) erro
 	if err := validateSFTPRequest(req, false); err != nil {
 		return err
 	}
-	log.Println("Sending data to SFTP...")
+	logger.Infof("Sending data to SFTP...")
 	_, err := connectSFTP(req.SFTPURL, req.SFTPUser, req.SFTPPassword)
 	if err != nil {
 		return err

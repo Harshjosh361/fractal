@@ -2,7 +2,8 @@ package integrations
 
 import (
 	"errors"
-	"log"
+
+	"github.com/SkySingh04/fractal/logger"
 
 	"github.com/SkySingh04/fractal/interfaces"
 	"github.com/SkySingh04/fractal/registry"
@@ -28,7 +29,7 @@ func (f FTPSource) FetchData(req interfaces.Request) (interface{}, error) {
 	if err := validateFTPRequest(req, true); err != nil {
 		return nil, err
 	}
-	log.Println("Fetching data from FTP...")
+	logger.Infof("Fetching data from FTP...")
 	conn, err := ftp.Dial(req.FTPURL)
 	if err != nil {
 		return nil, err
@@ -46,7 +47,7 @@ func (f FTPDestination) SendData(data interface{}, req interfaces.Request) error
 	if err := validateFTPRequest(req, false); err != nil {
 		return err
 	}
-	log.Println("Sending data to FTP...")
+	logger.Infof("Sending data to FTP...")
 	conn, err := ftp.Dial(req.FTPURL)
 	if err != nil {
 		return err
