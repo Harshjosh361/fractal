@@ -1,14 +1,6 @@
 inputconfig:
-<<<<<<< HEAD
     csvsourcefilename: sample.csv
 inputmethod: CSV
 outputconfig:
     csvdestinationfilename: samplecopy.csv
 outputmethod: CSV
-=======
-    connstring: postgres://postgres@localhost:5432/postgres?sslmode=disable
-inputmethod: PostgreSQL
-outputconfig:
-    connstring: postgres://postgres@localhost:5432/bae?sslmode=disable
-outputmethod: PostgreSQL
->>>>>>> c549015 (postgresql concurrency done)
