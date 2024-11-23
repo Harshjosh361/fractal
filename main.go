@@ -70,7 +70,7 @@ func main() {
 				}
 			}
 		}
-		// logger.Infof("Configuration loaded successfully: %+v", configuration)
+		logger.Infof("Configuration loaded successfully: %+v", configuration)
 		if _, ok := configuration["inputconfig"]; !ok {
 			logger.Fatalf("Missing 'inputconfig' in configuration")
 		}
@@ -154,7 +154,7 @@ func mapConfigToRequest(config map[string]interface{}) interfaces.Request {
 		CSVSourceFileName:       getStringField(config, "csvsourcefilename", ""),
 		CSVDestinationFileName:  getStringField(config, "csvdestinationfilename", ""),
 		JSONSourceData:          getStringField(config, "data", ""),
-		JSONOutputData:          getStringField(config, "data", ""),
+		JSONOutputFilename:      getStringField(config, "filename", ""),
 		YAMLSourceFilePath:      getStringField(config, "filepath", ""),
 		YAMLDestinationFilePath: getStringField(config, "filepath", ""),
 		DynamoDBSourceTable:     getStringField(config, "table", ""),

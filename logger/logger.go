@@ -16,3 +16,8 @@ func Fatalf(format string, args ...any) {
 	logger := gofr.New().Logger()
 	logger.Fatalf("[FATAL] "+format, args...)
 }
+
+func Warnf(format string, args ...any) {
+	logger := gofr.New().Logger()
+	logger.Warnf("[WARN] "+format, args...)
+}

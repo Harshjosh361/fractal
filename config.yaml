@@ -1,6 +1,6 @@
 inputconfig:
-    csvsourcefilename: sample.csv
-inputmethod: CSV
+    data: '{"akash" : "yay" }'
+inputmethod: JSON
 outputconfig:
-    csvdestinationfilename: fghjk.csv
-outputmethod: CSV
+    filename: hehe.json
+outputmethod: JSON
