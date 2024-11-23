@@ -2,6 +2,7 @@ package integrations
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -11,7 +12,6 @@ import (
 
 	firebase "firebase.google.com/go"
 	"google.golang.org/api/option"
-	// "google.golang.org/grpc/internal/resolver/dns"
 
 	"github.com/SkySingh04/fractal/interfaces"
 	"github.com/SkySingh04/fractal/logger"
@@ -21,8 +21,8 @@ import (
 // FirebaseSource struct represents the configuration for fetching data from Firebase.
 type FirebaseSource struct {
 	CredentialFileAddr string `json:"firebase_credential_file"` // Path to service account JSON file
-	Collection         string `json:"firebase_collection"`     // Collection name in Firebase
-	Document           string `json:"firebase_document"`       
+	Collection         string `json:"firebase_collection"`      // Collection name in Firebase
+	Document           string `json:"firebase_document"`
 }
 
 // FirebaseDestination struct represents the configuration for writing data to Firebase.
@@ -33,7 +33,7 @@ type FirebaseDestination struct {
 }
 
 func (f FirebaseSource) FetchData(req interfaces.Request) (interface{}, error) {
-	logger.Infof("Connecting to Firebase Source: Collection=%s, Document=%s, using Service Account=%s", 
+	logger.Infof("Connecting to Firebase Source: Collection=%s, Document=%s, using Service Account=%s",
 		f.Collection, f.Document, f.CredentialFileAddr)
 
 	// Validate configuration
@@ -84,7 +84,58 @@ func (f FirebaseSource) FetchData(req interfaces.Request) (interface{}, error) {
 	return transformedData, nil
 }
 
+// SendData connects to Firebase and writes data to the specified collection and document.
+func (f FirebaseDestination) SendData(data interface{}, req interfaces.Request) error {
+	logger.Infof("Writing data to Firebase database: Collection=%s, Document=%s", req.Collection, req.Document)
 
+	if f.CredentialFileAddr == "" || f.Collection == "" || f.Document == "" {
+		return errors.New("missing Firebase source configuration details")
+	}
+
+	// Initialize Firebase app with service account
+	opt := option.WithCredentialsFile(f.CredentialFileAddr)
+	app, err := firebase.NewApp(context.Background(), nil, opt)
+	if err != nil {
+		return fmt.Errorf("failed to initialize Firebase app: %w", err)
+	}
+
+	// Initialize Firestore client
+	client, err := app.Firestore(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to initialize Firestore client: %w", err)
+	}
+	defer client.Close()
+
+	// Ensure data is in the expected format
+	var post map[string]interface{}
+	if err := convertToMap(data, &post); err != nil {
+		logger.Errorf("Error converting data to Firestore format: %v", err)
+		return err
+	}
+
+	// Write data to the Firestore collection/document
+	_, err = client.Collection(req.Collection).Doc(req.Document).Set(context.Background(), post)
+	if err != nil {
+		logger.Errorf("Error writing to Firestore: %v", err)
+		return err
+	}
+
+	logger.Infof("Successfully written data to Firestore: Collection=%s, Document=%s", req.Collection, req.Document)
+	return nil
+}
+
+// convertToMap converts an interface{} to a map[string]interface{} for Firestore compatibility.
+func convertToMap(data interface{}, result *map[string]interface{}) error {
+	temp, err := json.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("failed to marshal data to JSON: %v", err)
+	}
+
+	if err := json.Unmarshal(temp, result); err != nil {
+		return fmt.Errorf("failed to unmarshal JSON to map: %v", err)
+	}
+	return nil
+}
 
 func validateFirebaseData(data map[string]interface{}) (map[string]interface{}, error) {
 	logger.Infof("Validating Firebase data: %v", data)

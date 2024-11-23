@@ -4,6 +4,5 @@ inputconfig:
     document: "1"
 inputmethod: Firebase
 outputconfig:
-    region: bla
-    tablename: new
-outputmethod: DynamoDB
+    csvdestinationfilename: firebasethingy
+outputmethod: CSV

@@ -53,8 +53,7 @@ type Request struct {
 	WebSocketSourceURL   string `json:"websocket_source_url"`   // WebSocket source URL
 	WebSocketDestURL     string `json:"websocket_dest_url"`     // WebSocket destination URL
 	// Firebase
-	CredentialFileAddr  string `json:"firebase_credential_file"`
+	CredentialFileAddr string `json:"firebase_credential_file"`
 	Collection         string `json:"firebase_collection"`
 	Document           string `json:"firebase_document"`
-
 }
