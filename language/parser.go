@@ -2,6 +2,7 @@ package language
 
 import (
 	"errors"
+	"fmt"
 )
 
 // Node represents a node in the Abstract Syntax Tree (AST)
@@ -19,30 +20,42 @@ func NewParser() *Parser {
 	return &Parser{}
 }
 
-// ParseRules parses the parameters into an AST
-func (p *Parser) ParseRules(params []string) (*Node, error) {
-	if len(params) < 3 {
+func (p *Parser) ParseRules(tokens []Token) (*Node, error) {
+	if len(tokens) < 3 {
 		return nil, errors.New("insufficient parameters")
 	}
 
 	root := &Node{Type: "ROOT", Children: []*Node{}}
+	var currentField string
 
-	for i := 0; i < len(params); i += 3 {
-		if i+2 >= len(params) {
-			return nil, errors.New("incomplete expression")
+	for i := 0; i < len(tokens); i++ {
+		token := tokens[i]
+
+		if token.Type == "FIELD" {
+			// Set the current field and continue to the next token
+			currentField = token.Value
+		} else if token.Type == "CONDITION" {
+			// Ensure there is a following value
+			if i+1 >= len(tokens) {
+				return nil, errors.New("expected value after condition")
+			}
+
+			condition := token
+			value := tokens[i+1] // Next token is the value
+
+			node := &Node{Type: "EXPRESSION", Children: []*Node{
+				{Type: "FIELD", Value: currentField},
+				{Type: "CONDITION", Value: condition.Value},
+				{Type: "VALUE", Value: value.Value},
+			}}
+
+			root.Children = append(root.Children, node)
+
+			// Move past the value token
+			i++
+		} else {
+			return nil, fmt.Errorf("unexpected token: %s", token.Value)
 		}
-
-		field := params[i]
-		condition := params[i+1]
-		value := params[i+2]
-
-		node := &Node{Type: "EXPRESSION", Children: []*Node{
-			{Type: "FIELD", Value: field},
-			{Type: "CONDITION", Value: condition},
-			{Type: "VALUE", Value: value},
-		}}
-
-		root.Children = append(root.Children, node)
 	}
 
 	return root, nil

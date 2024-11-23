@@ -141,11 +141,11 @@ func validateCSVData(data []byte, validationRules string) ([]byte, error) {
 
 	// Parse the tokens into an AST
 	parser := language.NewParser()
-	var tokenValues []string
-	for _, token := range tokens {
-		tokenValues = append(tokenValues, token.Value)
-	}
-	rulesAST, err := parser.ParseRules(tokenValues)
+	// var tokenValues []string
+	// for _, token := range tokens {
+	// 	tokenValues = append(tokenValues, token.Value)
+	// }
+	rulesAST, err := parser.ParseRules(tokens)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse validation rules: %v", err)
 	}
@@ -182,11 +182,11 @@ func transformCSVData(data []byte, transformationRules string) ([]byte, error) {
 
 	// Parse the tokens into an AST
 	parser := language.NewParser()
-	var tokenValues []string
-	for _, token := range tokens {
-		tokenValues = append(tokenValues, token.Value)
-	}
-	rulesAST, err := parser.ParseRules(tokenValues)
+	// var tokenValues []string
+	// for _, token := range tokens {
+	// 	tokenValues = append(tokenValues, token.Value)
+	// }
+	rulesAST, err := parser.ParseRules(tokens)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse transformation rules: %v", err)
 	}
