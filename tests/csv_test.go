@@ -10,12 +10,18 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const (
-	greenTick = "\033[32m✔\033[0m" // Green tick
-	redCross  = "\033[31m✘\033[0m" // Red cross
-)
+// const (
+// 	GreenTick = "\033[32m✔\033[0m" // Green tick
+// 	RedCross  = "\033[31m✘\033[0m" // Red cross
+// )
 
 func TestCSVIntegration(t *testing.T) {
+
+	const (
+		GreenTick = "\033[32m✔\033[0m" // Green tick
+		RedCross  = "\033[31m✘\033[0m" // Red cross
+	)
+	// Set up
 	inputFileName := "test_input.csv"
 	outputFileName := "test_output.csv"
 
@@ -26,7 +32,8 @@ Jane,30,San Francisco`
 	// Create a temporary input file
 	err := os.WriteFile(inputFileName, []byte(inputContent), 0644)
 	if err != nil {
-		t.Fatalf("%s Error creating test input file: %v\n", redCross, err)
+		fmt.Printf("%s Error creating test input file: %v\n", RedCross, err)
+		t.FailNow()
 	}
 	defer os.Remove(inputFileName)
 	defer os.Remove(outputFileName)
@@ -39,45 +46,40 @@ Jane,30,San Francisco`
 	csvSource := integrations.CSVSource{}
 	data, err := csvSource.FetchData(req)
 	if assert.NoError(t, err, "Error fetching data from CSV source") {
-		t.Logf("%s FetchData passed", greenTick)
+		fmt.Printf("%s FetchData passed\n", GreenTick)
 	} else {
-		t.Fatalf("%s FetchData failed", redCross)
+		fmt.Printf("%s FetchData failed\n", RedCross)
 	}
 
-	dataStr, ok := data.(string)
-	if !ok {
-		t.Fatalf("%s Data type mismatch: expected string", redCross)
-	}
-
-	expectedTransformedData := "NAME,AGE,CITY\nJOHN,25,NEW YORK\nJANE,30,SAN FRANCISCO"
-	dataStr = strings.TrimSpace(dataStr)
-	expectedTransformedData = strings.TrimSpace(expectedTransformedData)
-
-	if assert.Equal(t, expectedTransformedData, dataStr, "Transformed data mismatch") {
-		t.Logf("%s Data validation passed", greenTick)
+	// Validate transformed data
+	expectedTransformedData := `NAME,AGE,CITY
+JOHN,25,NEW YORK
+JANE,30,SAN FRANCISCO
+`
+	if assert.Equal(t, expectedTransformedData, string(data.([]byte)), "Transformed data mismatch") {
+		fmt.Printf("%s Data validation passed\n", GreenTick)
 	} else {
-		t.Fatalf("%s Data validation failed", redCross)
+		fmt.Printf("%s Data validation failed\n", RedCross)
 	}
 
 	csvDestination := integrations.CSVDestination{}
 	err = csvDestination.SendData(dataStr, req)
 	if assert.NoError(t, err, "Error sending data to CSV destination") {
-		t.Logf("%s SendData passed", greenTick)
+		fmt.Printf("%s SendData passed\n", GreenTick)
 	} else {
-		t.Fatalf("%s SendData failed", redCross)
+		fmt.Printf("%s SendData failed\n", RedCross)
 	}
 
 	outputData, err := os.ReadFile(outputFileName)
 	if assert.NoError(t, err, "Error reading test output file") {
-		t.Logf("%s Output file reading passed", greenTick)
+		fmt.Printf("%s Output file reading passed\n", GreenTick)
 	} else {
-		t.Fatalf("%s Output file reading failed", redCross)
+		fmt.Printf("%s Output file reading failed\n", RedCross)
 	}
 
-	outputDataStr := strings.TrimSpace(string(outputData))
-	if assert.Equal(t, expectedTransformedData, outputDataStr, "Output file content mismatch") {
-		t.Logf("%s Output file content validation passed", greenTick)
+	if assert.Equal(t, expectedTransformedData, string(outputData), "Output file content mismatch") {
+		fmt.Printf("%s Output file content validation passed\n", GreenTick)
 	} else {
-		t.Fatalf("%s Output file content validation failed", redCross)
+		fmt.Printf("%s Output file content validation failed\n", RedCross)
 	}
 }

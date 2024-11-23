@@ -4,6 +4,7 @@ go 1.22.2
 
 require (
 	firebase.google.com/go v3.13.0+incompatible
+	github.com/golang/mock v1.1.1
 	github.com/jlaffaye/ftp v0.2.0
 	github.com/manifoldco/promptui v0.9.0
 	github.com/pkg/sftp v1.13.7
@@ -35,6 +36,7 @@ require (
 	github.com/spf13/afero v1.11.0 // indirect
 	github.com/spf13/cast v1.6.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
+	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
 	github.com/xdg-go/scram v1.1.2 // indirect
