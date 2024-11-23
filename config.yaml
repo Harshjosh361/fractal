@@ -1,6 +1,12 @@
+errorhandling:
+    strategy: LOG_AND_CONTINUE
 inputconfig:
-    url: wss://echo.websocket.org
-inputmethod: WebSocket
+    csvsourcefilename: sample.csv
+inputmethod: CSV
 outputconfig:
-    url: wss://echo.websocket.org
-outputmethod: WebSocket
+    csvdestinationfilename: test.csv
+outputmethod: CSV
+transformations: |
+    ADD_FIELD("processed_at", CURRENT_TIME())
+validations: |
+    FIELD("age") TYPE(INT) RANGE(18, 65)

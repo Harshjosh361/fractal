@@ -10,6 +10,29 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Config represents the entire configuration structure
+type Config struct {
+	InputMethod     string                 `yaml:"inputMethod"`
+	OutputMethod    string                 `yaml:"outputMethod"`
+	InputConfig     map[string]interface{} `yaml:"inputconfig"`
+	OutputConfig    map[string]interface{} `yaml:"outputconfig"`
+	Validations     []string               `yaml:"validations"`
+	Transformations []string               `yaml:"transformations"`
+	ErrorHandling   ErrorHandling          `yaml:"errorhandling"`
+}
+
+// ErrorHandling represents the error handling configuration
+type ErrorHandling struct {
+	Strategy         string           `yaml:"strategy"`
+	QuarantineOutput QuarantineOutput `yaml:"quarantineoutput"`
+}
+
+// QuarantineOutput represents the quarantine output configuration
+type QuarantineOutput struct {
+	Type     string `yaml:"type"`
+	Location string `yaml:"location"`
+}
+
 // AskForMode prompts the user to select between starting the HTTP server or using the CLI
 func AskForMode() (string, error) {
 	modePrompt := promptui.Select{
@@ -33,10 +56,13 @@ func LoadConfig(configFile string) (map[string]interface{}, error) {
 	}
 
 	config := map[string]interface{}{
-		"inputMethod":  viper.GetString("inputMethod"),
-		"outputMethod": viper.GetString("outputMethod"),
-		"inputconfig":  viper.GetStringMap("inputconfig"),
-		"outputconfig": viper.GetStringMap("outputconfig"),
+		"inputMethod":     viper.GetString("inputMethod"),
+		"outputMethod":    viper.GetString("outputMethod"),
+		"inputconfig":     viper.GetStringMap("inputconfig"),
+		"outputconfig":    viper.GetStringMap("outputconfig"),
+		"errorhandling":   viper.GetStringMap("errorhandling"),
+		"validations":     viper.GetStringMap("validations"),
+		"transformations": viper.GetStringMap("transformations"),
 	}
 
 	return config, nil
@@ -81,18 +107,33 @@ func SetupConfigInteractively() (map[string]interface{}, error) {
 		return nil, fmt.Errorf("failed to get fields for output method: %w", err)
 	}
 
+	// Read validations and transformations
+	validations, err := readRules("validations")
+	if err != nil {
+		return nil, fmt.Errorf("failed to read validation rules: %w", err)
+	}
+	transformations, err := readRules("transformations")
+	if err != nil {
+		return nil, fmt.Errorf("failed to read transformation rules: %w", err)
+	}
+
+	// Read error handling
+	errorhandling, err := readErrorHandlingConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read error handling configuration: %w", err)
+	}
+
 	// Combine all configurations
 	config := map[string]interface{}{
-		"inputMethod":  inputMethod,
-		"outputMethod": outputMethod,
-		"inputconfig":  inputconfig,
-		"outputconfig": outputconfig,
+		"inputMethod":     inputMethod,
+		"outputMethod":    outputMethod,
+		"inputconfig":     inputconfig,
+		"outputconfig":    outputconfig,
+		"validations":     validations,
+		"transformations": transformations,
+		"errorhandling":   errorhandling,
 	}
-	//TODO : FIX THIS BUG OF MISSING INPUT CONFIG IN CONFIGURATION
 	saveConfig(config)
-
-	//wait for 2
-	// time.Sleep(5 * time.Second)
 
 	return config, nil
 }
@@ -142,6 +183,40 @@ func readIntegrationFields(method string, isSource bool) (map[string]interface{}
 	}
 
 	return config, nil
+}
+
+// readRules reads validation or transformation rules interactively
+func readRules(ruleType string) (string, error) {
+	prompt := promptui.Prompt{
+		Label: fmt.Sprintf("Enter %s rules (multiline, finish with empty line):", ruleType),
+	}
+	rules := ""
+	for {
+		line, err := prompt.Run()
+		if err != nil {
+			return "", fmt.Errorf("failed to read %s: %w", ruleType, err)
+		}
+		if line == "" {
+			break
+		}
+		rules += line + "\n"
+	}
+	return rules, nil
+}
+
+// readErrorHandlingConfig prompts for error handling strategy and quarantine details
+func readErrorHandlingConfig() (map[string]interface{}, error) {
+	prompt := promptui.Prompt{
+		Label: "Enter Error Handling Strategy (e.g., LOG_AND_CONTINUE, STOP_ON_ERROR):",
+	}
+	strategy, err := prompt.Run()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read error handling strategy: %w", err)
+	}
+
+	return map[string]interface{}{
+		"strategy": strategy,
+	}, nil
 }
 
 // saveConfig writes the configuration to a config.yaml file

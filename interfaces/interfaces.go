@@ -10,8 +10,11 @@ type DataDestination interface {
 
 // Request struct to hold migration request data
 type Request struct {
-	Input                   string `json:"input"`          // List of input types (Kafka, SQL, MongoDB, etc.)
-	Output                  string `json:"output"`         // List of output types (CSV, MongoDB, etc.)
+	Input                   string `json:"input"`            // List of input types (Kafka, SQL, MongoDB, etc.)
+	Output                  string `json:"output"`           // List of output types (CSV, MongoDB, etc.)
+	ValidationRules         string `json:"validation_rules"` // Validation rules
+	TransformationRules     string `json:"transformation_rules"`
+	ErrorHandling           string `json:"error_handling"`
 	ConsumerURL             string `json:"consumer_url"`   // URL for Kafka
 	ConsumerTopic           string `json:"consumer_topic"` // Topic for Kafka
 	ProducerURL             string `json:"producer_url"`

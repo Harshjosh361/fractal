@@ -3,10 +3,12 @@ package integrations
 import (
 	"encoding/csv"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 
 	"github.com/SkySingh04/fractal/interfaces"
+	"github.com/SkySingh04/fractal/language"
 	"github.com/SkySingh04/fractal/logger"
 	"github.com/SkySingh04/fractal/registry"
 )
@@ -34,6 +36,7 @@ func ReadCSV(fileName string) ([]byte, error) {
 	return data, nil
 }
 
+// WriteCSV writes data to a CSV file.
 func WriteCSV(fileName string, data []byte) error {
 	file, err := os.Create(fileName)
 	if err != nil {
@@ -42,7 +45,7 @@ func WriteCSV(fileName string, data []byte) error {
 	defer file.Close()
 
 	writer := csv.NewWriter(file)
-	records := strings.Split(string(data), "\n")
+	records := strings.Split(strings.TrimSpace(string(data)), "\n")
 	for _, record := range records {
 		fields := strings.Split(record, ",")
 		err := writer.Write(fields)
@@ -79,18 +82,17 @@ func (r CSVSource) FetchData(req interfaces.Request) (interface{}, error) {
 	}
 
 	// Validate the data
-	validatedData, err := validateCSVData(data)
+	validatedData, err := validateCSVData(data, req.ValidationRules)
 	if err != nil {
 		return nil, err
 	}
 
 	// Transform the data
-	transformedData, err := transformCSVData(validatedData)
+	transformedData, err := transformCSVData(validatedData, req.TransformationRules)
 	if err != nil {
 		return nil, err
 	}
 	return transformedData, nil
-
 }
 
 // SendData connects to CSV and publishes data to the specified queue.
@@ -115,24 +117,90 @@ func init() {
 	registry.RegisterDestination("CSV", CSVDestination{})
 }
 
-// validateCSVData ensures the input data meets the required criteria.
-func validateCSVData(data []byte) ([]byte, error) {
+// validateCSVData ensures the input data meets the required criteria using validation rules.
+func validateCSVData(data []byte, validationRules string) ([]byte, error) {
+	
 	logger.Infof("Validating data: %s", data)
 
-	// Example: Check if data is non-empty
 	if len(data) == 0 {
 		return nil, errors.New("data is empty")
 	}
 
-	// Add custom validation logic here
+	// Initialize lexer and tokenize the validation rules
+	lexer := language.NewLexer(validationRules)
+	tokens, err := lexer.Tokenize()
+	if err != nil {
+		return nil, fmt.Errorf("failed to tokenize validation rules: %v", err)
+	}
+
+	// Parse the tokens into an AST
+	parser := language.NewParser(tokens)
+	rulesAST, err := parser.ParseRules()
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse validation rules: %v", err)
+	}
+
+	// Apply validation rules to data
+	records := strings.Split(strings.TrimSpace(string(data)), "\n")
+	for _, record := range records {
+		for _, ruleNode := range rulesAST.Children {
+			err := applyValidationRule(record, ruleNode)
+			if err != nil {
+				return nil, err // Return the first validation error encountered
+			}
+		}
+	}
+
 	return data, nil
+
 }
 
-// transformCSVData modifies the input data as per business logic.
-func transformCSVData(data []byte) ([]byte, error) {
+// transformCSVData modifies the input data as per business logic using transformation rules.
+func transformCSVData(data []byte, transformationRules string) ([]byte, error) {
 	logger.Infof("Transforming data: %s", data)
 
-	// Example: Convert data to uppercase (modify as needed)
-	transformed := []byte(strings.ToUpper(string(data)))
-	return transformed, nil
+	// Initialize lexer and tokenize the transformation rules
+	lexer := language.NewLexer(transformationRules)
+	tokens, err := lexer.Tokenize()
+	if err != nil {
+		return nil, fmt.Errorf("failed to tokenize transformation rules: %v", err)
+	}
+
+	// Parse the tokens into an AST
+	parser := language.NewParser(tokens)
+	rulesAST, err := parser.ParseRules()
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse transformation rules: %v", err)
+	}
+
+	// Apply transformation rules to data
+	var transformedRecords []string
+	records := strings.Split(strings.TrimSpace(string(data)), "\n")
+	for _, record := range records {
+		for _, ruleNode := range rulesAST.Children {
+			transformedRecord, err := applyTransformationRule(record, ruleNode)
+			if err != nil {
+				return nil, err
+			}
+			record = transformedRecord // Apply each rule sequentially
+		}
+		transformedRecords = append(transformedRecords, record)
+	}
+
+	return []byte(strings.Join(transformedRecords, "\n")), nil
+}
+
+// applyValidationRule processes a single record against a validation rule AST node.
+func applyValidationRule(record string, ruleNode *language.Node) error {
+	// Implementation details based on your business rules
+	// Validate the record using the information from ruleNode
+	// Example: Check if a specific field meets the condition
+	return nil // Replace with actual validation logic
+}
+
+// applyTransformationRule processes a single record against a transformation rule AST node.
+func applyTransformationRule(record string, ruleNode *language.Node) (string, error) {
+	// Implementation details based on your business logic
+	// Transform the record using the information from ruleNode
+	return record, nil // Replace with actual transformation logic
 }

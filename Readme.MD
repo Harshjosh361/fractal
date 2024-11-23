@@ -155,26 +155,28 @@ Depending on the data source, fields can be named using:
 The rules can be embedded into the YAML configuration for pipelines:
 
 ```yaml
-pipeline:
-  - name: "CSV to Firebase Pipeline"
-    input:
-      type: "CSV"
-      source: "/data/input.csv"
-    validation:
-      rules: |
-        FIELD("age") TYPE(INT) RANGE(18, 65)
-        FIELD("email") MATCHES(EMAIL_REGEX)
-    transformation:
-      rules: |
-        RENAME("old_field", "new_field")
-        IF FIELD("age") > 50 THEN ADD_FIELD("senior_discount", TRUE)
-    output:
-      type: "Firebase"
-      destination: "firebase://project_name/collection"
-    error_handling: |
-      ON_ERROR(LOG_AND_CONTINUE)
-```
+inputconfig:
+  url: wss://echo.websocket.org
+inputmethod: WebSocket
 
+outputconfig:
+  url: wss://echo.websocket.org
+outputmethod: WebSocket
+
+validation:
+  rules: |
+    FIELD("message") REQUIRED
+    FIELD("timestamp") TYPE(INT) RANGE(1609459200, 1704067200)
+
+transformation:
+  rules: |
+    ADD_FIELD("processed_at", CURRENT_TIME())
+    IF FIELD("message") MATCHES("^hello") THEN RENAME("message", "greeting")
+    MAP("status", {"0": "inactive", "1": "active"})
+
+error_handling:
+  on_error: LOG_AND_CONTINUE
+```
 ---
 
 # Adding a New Integration
