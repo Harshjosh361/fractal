@@ -1,8 +1,6 @@
 inputconfig:
-    region: us-east-1
-    tablename: input
-inputmethod: DynamoDB
+    url: wss://echo.websocket.org
+inputmethod: WebSocket
 outputconfig:
-    region: us-east-1
-    tablename: output
-outputmethod: DynamoDB
+    url: wss://echo.websocket.org
+outputmethod: WebSocket
