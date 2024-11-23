@@ -95,12 +95,17 @@ func TestFirebaseIntegration(t *testing.T) {
 		fmt.Printf("%s Data validation passed\n", GreenTick)
 	} else {
 		fmt.Printf("%s Data validation failed\n", RedCross)
-	}
+	}// Parse the "processed" time string
+parsedTime, err := time.Parse(time.RFC3339, resultData["processed"].(string))
+if assert.NoError(t, err) {
+    // Check the processed field (it should match the current time within a small tolerance)
+    if assert.WithinDuration(t, time.Now(), parsedTime, time.Second) {
+        fmt.Printf("%s Processed field validation passed\n", GreenTick)
+    } else {
+        fmt.Printf("%s Processed field validation failed\n", RedCross)
+    }
+} else {
+    fmt.Printf("%s Error parsing processed time: %v\n", RedCross, err)
+}
 
-	// Check the processed field (it should match the current time in RFC3339 format)
-	if assert.Equal(t, resultData["processed"], fmt.Sprintf("%s", time.Now().Format(time.RFC3339))) {
-		fmt.Printf("%s Processed field validation passed\n", GreenTick)
-	} else {
-		fmt.Printf("%s Processed field validation failed\n", RedCross)
-	}
 }
