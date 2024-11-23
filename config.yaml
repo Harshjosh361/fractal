@@ -1,10 +1,6 @@
 inputconfig:
-    collection: sampledata
-    credentialfileaddr: firebaseConfig.json
-    document: "1"
-inputmethod: Firebase
+    csvsourcefilename: sample.csv
+inputmethod: CSV
 outputconfig:
-    collection: sampledata
-    credentialfileaddr: firebaseConfig.json
-    document: newfirebasedoc
-outputmethod: Firebase
+    csvdestinationfilename: samplecopy.csv
+outputmethod: CSV
