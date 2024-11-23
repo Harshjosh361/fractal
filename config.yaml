@@ -1,8 +1,8 @@
 inputconfig:
-    region: us-east
+    region: us-east-1
     tablename: input
 inputmethod: DynamoDB
 outputconfig:
-    region: us-east
+    region: us-east-1
     tablename: output
 outputmethod: DynamoDB
