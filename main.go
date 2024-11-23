@@ -49,111 +49,79 @@ func main() {
 	app := gofr.New()
 	fmt.Print(logo)
 
-	// Ask if the user wants to start HTTP Server or use CLI
+	// Ask for mode selection
 	mode, err := config.AskForMode()
 	if err != nil {
 		logger.Fatalf("Failed to select application mode: %v", err)
 	}
 
-	// Add cron job to fetch and process data every 5 hours
-	app.AddCronJob("* */5 * * *", "Data Fetch and Process", func(ctx *gofr.Context) {
-		//  1: Fetch data
-		data, err := fetchData()
-		if err != nil {
-			ctx.Logger.Errorf("Error fetching data: %v", err)
-			return
-		}
-		ctx.Logger.Infof("Fetched %d records.", len(data))
-
-		//  2: Process the data
-		processedData, err := processData(data)
-		if err != nil {
-			ctx.Logger.Errorf("Error processing data: %v", err)
-			return
-		}
-
-		ctx.Logger.Infof("Processed %d records.", len(processedData))
-		ctx.Logger.Infof("Data fetching and processing completed successfully.")
-	})
-
 	if mode == "Start HTTP Server" {
 		logger.Infof("Starting HTTP Server... Welcome to the Fractal API!")
 
-		// Register routes
+		// Register route greet
 		app.GET("/greet", func(ctx *gofr.Context) (interface{}, error) {
 			return "Hello World!", nil
 		})
 
-		// Register other routes as needed
+		// Register other routes as necessary
 		app.POST("/api/migration", controller.MigrationHandler)
 
-		// Run HTTP server
+		// Default port 8000
 		app.Run()
-
 	} else if mode == "Use CLI" {
-		// Load or set up the configuration for CLI mode
+		// CLI Mode Logic
+		// Load configuration
 		configuration, err := config.LoadConfig("config.yaml")
 		if err != nil {
-			logger.Logf("Config file not found. Let's set up the input and output methods.")
-			configMap, err := config.SetupConfigInteractively()
+			logger.Fatalf("Config file not found. Setup interactively: %v", err)
+		}
+		logger.Infof("Configuration loaded: %+v", configuration)
+
+		// Define the task to be executed
+		task := func() {
+			logger.Infof("Cron job triggered at: %s", time.Now().Format(time.RFC3339))
+
+			// Your task logic (e.g., data fetch and send to CSV)
+			inputMethod, inputconfig := configuration["inputMethod"], configuration["inputconfig"].(map[string]interface{})
+			outputMethod, outputconfig := configuration["outputMethod"], configuration["outputconfig"].(map[string]interface{})
+
+			// Fetch data from input integration
+			inputIntegration, found := registry.GetSource(inputMethod.(string))
+			if !found {
+				logger.Fatalf("Input method %s not registered", inputMethod)
+			}
+			inputRequest := mapConfigToRequest(inputconfig)
+			data, err := inputIntegration.FetchData(inputRequest)
 			if err != nil {
-				logger.Fatalf("Failed to set up configuration: %v", err)
+				logger.Fatalf("Failed to fetch data from %s: %v", inputMethod, err)
 			}
-			configuration := make(map[string]interface{})
-			for key, value := range configMap {
-				switch v := value.(type) {
-				case string:
-					configuration[key] = v
-				case map[string]interface{}:
-					logger.Logf("Key %s has a nested map value: %v", key, v)
-					configuration[key] = v
-				default:
-					logger.Logf("Key %s has a value of unhandled type %T: %v", key, v, v)
-					configuration[key] = v
-				}
+
+			// Send data to output integration
+			outputIntegration, found := registry.GetDestination(outputMethod.(string))
+			if !found {
+				logger.Fatalf("Output method %s not registered", outputMethod)
 			}
-		}
-		logger.Infof("Configuration loaded successfully: %+v", configuration)
-		if _, ok := configuration["inputconfig"]; !ok {
-			logger.Fatalf("Missing 'inputconfig' in configuration")
-		}
+			outputRequest := mapConfigToRequest(outputconfig)
+			err = outputIntegration.SendData(data, outputRequest)
+			if err != nil {
+				logger.Fatalf("Failed to send data to %s: %v", outputMethod, err)
+			}
 
-		if _, ok := configuration["outputconfig"]; !ok {
-			logger.Fatalf("Missing 'outputconfig' in configuration")
-		}
-
-		// Get the input and output methods from the configuration
-		inputMethod, inputconfig := configuration["inputMethod"], configuration["inputconfig"].(map[string]interface{})
-		outputMethod, outputconfig := configuration["outputMethod"], configuration["outputconfig"].(map[string]interface{})
-
-		// Fetch data from the input method
-		inputIntegration, found := registry.GetSource(inputMethod.(string))
-		if !found {
-			logger.Fatalf("Input method %s not registered", inputMethod)
+			logger.Infof("Data sent successfully")
 		}
 
-		inputRequest := mapConfigToRequest(inputconfig)
-		data, err := inputIntegration.FetchData(inputRequest)
-		if err != nil {
-			logger.Fatalf("Failed to fetch data from %s: %v", inputMethod, err)
+		// Run the task immediately
+		task()
+
+		// Repeat the task every minute (time.Tick creates a ticker for the interval)
+		ticker := time.NewTicker(5 * time.Second) // Adjust the interval as needed (1 minute)
+		defer ticker.Stop()
+
+		// Infinite loop to keep executing the task every minute
+		for range ticker.C {
+			// Execute the task on each tick
+			task()
 		}
-
-		// Send data to the output method
-		outputIntegration, found := registry.GetDestination(outputMethod.(string))
-		if !found {
-			logger.Fatalf("Output method %s not registered", outputMethod)
-		}
-
-		logger.Infof("Sending data to %s...", outputMethod)
-		logger.Infof("Output configuration: %+v", outputconfig)
-
-		outputRequest := mapConfigToRequest(outputconfig)
-		err = outputIntegration.SendData(data, outputRequest)
-		if err != nil {
-			logger.Fatalf("Failed to send data to %s: %v", outputMethod, err)
-		}
-
-		logger.Infof("Data sent to %s successfully", outputMethod)
 	}
 }
 
@@ -163,42 +131,6 @@ func getStringField(config map[string]interface{}, field string, defaultValue st
 	}
 	return defaultValue
 }
-
-	return interfaces.Request{
-		Input:                   getStringField(config, "inputmethod", ""),
-		Output:                  getStringField(config, "outputmethod", ""),
-		RabbitMQInputURL:        getStringField(config, "url", ""),
-		RabbitMQInputQueueName:  getStringField(config, "queuename", ""),
-		RabbitMQOutputURL:       getStringField(config, "url", ""),
-		RabbitMQOutputQueueName: getStringField(config, "queuename", ""),
-		ConsumerURL:             getStringField(config, "url", ""),
-		ConsumerTopic:           getStringField(config, "topic", ""),
-		ProducerURL:             getStringField(config, "url", ""),
-		ProducerTopic:           getStringField(config, "topic", ""),
-		SQLSourceConnString:     getStringField(config, "connstring", ""),
-		SQLTargetConnString:     getStringField(config, "connstring", ""),
-		SourceMongoDBConnString: getStringField(config, "connstring", ""),
-		SourceMongoDBDatabase:   getStringField(config, "database", ""),
-		SourceMongoDBCollection: getStringField(config, "collection", ""),
-		TargetMongoDBConnString: getStringField(config, "connstring", ""),
-		TargetMongoDBDatabase:   getStringField(config, "database", ""),
-		TargetMongoDBCollection: getStringField(config, "collection", ""),
-		OutputFileName:          getStringField(config, "filename", ""),
-		CSVSourceFileName:       getStringField(config, "csvsourcefilename", ""),
-		CSVDestinationFileName:  getStringField(config, "csvdestinationfilename", ""),
-		JSONSourceData:          getStringField(config, "data", ""),
-		JSONOutputFilename:      getStringField(config, "filename", ""),
-		YAMLSourceFilePath:      getStringField(config, "filepath", ""),
-		YAMLDestinationFilePath: getStringField(config, "filepath", ""),
-		DynamoDBSourceTable:     getStringField(config, "tablename", ""),
-		DynamoDBTargetTable:     getStringField(config, "tablename", ""),
-		DynamoDBSourceRegion:    getStringField(config, "region", ""),
-		DynamoDBTargetRegion:    getStringField(config, "region", ""),
-		FTPFILEPATH:             getStringField(config, "ftpfilepath", ""),
-		FTPURL:                  getStringField(config, "url", ""),
-		FTPUser
-
-
 
 func mapConfigToRequest(config map[string]interface{}) interfaces.Request {
 
@@ -232,18 +164,13 @@ func mapConfigToRequest(config map[string]interface{}) interfaces.Request {
 		DynamoDBTargetTable:     getStringField(config, "tablename", ""),
 		DynamoDBSourceRegion:    getStringField(config, "region", ""),
 		DynamoDBTargetRegion:    getStringField(config, "region", ""),
-		FTPFILEPATH:             getStringField(config, "ftpfilepath", ""),
 		FTPURL:                  getStringField(config, "url", ""),
 		FTPUser:                 getStringField(config, "user", ""),
 		FTPPassword:             getStringField(config, "password", ""),
-		SFTPFILEPATH:            getStringField(config, "sftpfilepath", ""),
 		SFTPURL:                 getStringField(config, "url", ""),
 		SFTPUser:                getStringField(config, "user", ""),
 		SFTPPassword:            getStringField(config, "password", ""),
 		WebSocketSourceURL:      getStringField(config, "url", ""),
 		WebSocketDestURL:        getStringField(config, "url", ""),
-		CredentialFileAddr:      getStringField(config, "credentialfileaddr", "firebaseConfig.json"),
-		Document:                getStringField(config, "document", "sampledata"),
-		Collection:              getStringField(config, "collection", "1"),
 	}
 }
