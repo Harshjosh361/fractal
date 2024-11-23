@@ -26,15 +26,17 @@ func AskForMode() (string, error) {
 }
 
 // LoadConfig attempts to read the configuration from a file
-func LoadConfig(configFile string) (map[string]string, error) {
+func LoadConfig(configFile string) (map[string]interface{}, error) {
 	viper.SetConfigFile(configFile)
 	if err := viper.ReadInConfig(); err != nil {
 		return nil, err
 	}
 
-	config := map[string]string{
+	config := map[string]interface{}{
 		"inputMethod":  viper.GetString("inputMethod"),
 		"outputMethod": viper.GetString("outputMethod"),
+		"inputconfig":  viper.GetStringMap("inputconfig"),
+		"outputconfig": viper.GetStringMap("outputconfig"),
 	}
 
 	return config, nil
@@ -58,7 +60,7 @@ func SetupConfigInteractively() (map[string]interface{}, error) {
 	}
 
 	// Read additional fields for the input method
-	inputConfig, err := readIntegrationFields(inputMethod, true)
+	inputconfig, err := readIntegrationFields(inputMethod, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get fields for input method: %w", err)
 	}
@@ -74,7 +76,7 @@ func SetupConfigInteractively() (map[string]interface{}, error) {
 	}
 
 	// Read additional fields for the output method
-	outputConfig, err := readIntegrationFields(outputMethod, false)
+	outputconfig, err := readIntegrationFields(outputMethod, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get fields for output method: %w", err)
 	}
@@ -83,8 +85,8 @@ func SetupConfigInteractively() (map[string]interface{}, error) {
 	config := map[string]interface{}{
 		"inputMethod":  inputMethod,
 		"outputMethod": outputMethod,
-		"inputConfig":  inputConfig,
-		"outputConfig": outputConfig,
+		"inputconfig":  inputconfig,
+		"outputconfig": outputconfig,
 	}
 
 	// Optionally save the config to a file for future runs
