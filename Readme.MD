@@ -275,28 +275,23 @@ go mod tidy
 Set up a `.yaml` configuration file in the root directory. Define inputs, transformations, validations, and outputs as per your workflow needs. Here's a basic example:
 
 ```yaml
-pipeline:
-  - name: "CSV to MongoDB Migration"
-    input:
-      type: "CSV"
-      source: "./data/input.csv"
-    validation:
-      schema:
-        fields:
-          - name: "id"
-            type: "integer"
-            required: true
-          - name: "name"
-            type: "string"
-            required: true
-    transformation:
-      - map:
-          from: "old_field_name"
-          to: "new_field_name"
-    output:
-      type: "MongoDB"
-      destination: "mongodb://localhost:27017/fractal_db"
-      collection: "data_output"
+error-handling:
+   strategy: LOG_AND_CONTINUE
+inputconfig:
+   csvsourcefilename: sample.csv
+   inputmethod: CSV
+outputconfig:
+   csvdestinationfilename: test.csv
+   outputmethod: CSV
+cronjob:
+   repetition_interval: "1h"
+monitoring:
+   job_status:"pending"
+transformations:
+   -ADD_FIELD("processed_at", CURRENT_TIME())
+validations:
+   -FIELD("age") RANGE(30,35)
+  
 ```
 
 ### Running Fractal
