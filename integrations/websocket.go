@@ -2,10 +2,12 @@ package integrations
 
 import (
 	"errors"
-	"log"
-	"github.com/gorilla/websocket"
+
+	"github.com/SkySingh04/fractal/logger"
+
 	"github.com/SkySingh04/fractal/interfaces"
 	"github.com/SkySingh04/fractal/registry"
+	"github.com/gorilla/websocket"
 )
 
 // WebSocketSource implements the DataSource interface
@@ -23,7 +25,7 @@ func (w WebSocketSource) FetchData(req interfaces.Request) (interface{}, error) 
 	if err := validateWebSocketRequest(req, true); err != nil {
 		return nil, err
 	}
-	log.Println("Fetching data from WebSocket...")
+	logger.Infof("Fetching data from WebSocket...")
 	conn, _, err := websocket.DefaultDialer.Dial(req.WebSocketSourceURL, nil)
 	if err != nil {
 		return nil, err
@@ -42,7 +44,7 @@ func (w WebSocketDestination) SendData(data interface{}, req interfaces.Request)
 	if err := validateWebSocketRequest(req, false); err != nil {
 		return err
 	}
-	log.Println("Sending data to WebSocket...")
+	logger.Infof("Sending data to WebSocket...")
 	conn, _, err := websocket.DefaultDialer.Dial(req.WebSocketDestURL, nil)
 	if err != nil {
 		return err

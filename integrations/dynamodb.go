@@ -3,7 +3,8 @@ package integrations
 import (
 	"errors"
 	"fmt"
-	"log"
+
+	"github.com/SkySingh04/fractal/logger"
 
 	"github.com/SkySingh04/fractal/interfaces"
 	"github.com/SkySingh04/fractal/registry"
@@ -29,7 +30,7 @@ func (d DynamoDBSource) FetchData(req interfaces.Request) (interface{}, error) {
 	if err := validateDynamoDBRequest(req, true); err != nil {
 		return nil, err
 	}
-	log.Println("Fetching data from DynamoDB...")
+	logger.Infof("Fetching data from DynamoDB...")
 	sess, err := session.NewSession(&aws.Config{
 		Region: aws.String(req.DynamoDBSourceRegion),
 	})
@@ -53,7 +54,7 @@ func (d DynamoDBDestination) SendData(data interface{}, req interfaces.Request) 
 	if err := validateDynamoDBRequest(req, false); err != nil {
 		return err
 	}
-	log.Println("Sending data to DynamoDB...")
+	logger.Infof("Sending data to DynamoDB...")
 	// Example logic for sending data, adapt as needed
 	sess, err := session.NewSession(&aws.Config{
 		Region: aws.String(req.DynamoDBTargetRegion),

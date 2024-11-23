@@ -2,7 +2,8 @@ package integrations
 
 import (
 	"errors"
-	"log"
+
+	"github.com/SkySingh04/fractal/logger"
 
 	"github.com/SkySingh04/fractal/interfaces"
 	"github.com/SkySingh04/fractal/registry"
@@ -24,7 +25,7 @@ func (m MongoDBSource) FetchData(req interfaces.Request) (interface{}, error) {
 	if req.SourceMongoDBConnString == "" || req.SourceMongoDBDatabase == "" || req.SourceMongoDBCollection == "" {
 		return nil, errors.New("missing MongoDB source connection details")
 	}
-	log.Println("Fetching data from MongoDB source...")
+	logger.Infof("Fetching data from MongoDB source...")
 	// Add MongoDB fetch logic here
 	return "MongoDBData", nil
 }
@@ -33,7 +34,7 @@ func (m MongoDBDestination) SendData(data interface{}, req interfaces.Request) e
 	if req.TargetMongoDBConnString == "" || req.TargetMongoDBDatabase == "" || req.TargetMongoDBCollection == "" {
 		return errors.New("missing MongoDB target connection details")
 	}
-	log.Println("Sending data to MongoDB target...")
+	logger.Infof("Sending data to MongoDB target...")
 	// Add MongoDB send logic here
 	return nil
 }

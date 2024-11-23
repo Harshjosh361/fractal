@@ -2,7 +2,8 @@ package integrations
 
 import (
 	"errors"
-	"log"
+
+	"github.com/SkySingh04/fractal/logger"
 
 	"github.com/SkySingh04/fractal/interfaces"
 	"github.com/SkySingh04/fractal/registry"
@@ -25,7 +26,7 @@ func (k KafkaSource) FetchData(req interfaces.Request) (interface{}, error) {
 	if err := validateKafkaRequest(req, true); err != nil {
 		return nil, err
 	}
-	log.Println("Fetching data from Kafka...")
+	logger.Infof("Fetching data from Kafka...")
 	// Your Kafka fetch logic here
 	return "KafkaData", nil
 }
@@ -35,7 +36,7 @@ func (k KafkaDestination) SendData(data interface{}, req interfaces.Request) err
 	if err := validateKafkaRequest(req, false); err != nil {
 		return err
 	}
-	log.Println("Sending data to Kafka...")
+	logger.Infof("Sending data to Kafka...")
 	// Your Kafka send logic here
 	return nil
 }

@@ -2,7 +2,8 @@ package integrations
 
 import (
 	"errors"
-	"log"
+
+	"github.com/SkySingh04/fractal/logger"
 
 	"github.com/SkySingh04/fractal/interfaces"
 	"github.com/SkySingh04/fractal/registry"
@@ -20,7 +21,7 @@ func (j JSONSource) FetchData(req interfaces.Request) (interface{}, error) {
 	if req.JSONSourceData == "" {
 		return nil, errors.New("missing JSON source data")
 	}
-	log.Println("Fetching data from JSON source...")
+	logger.Infof("Fetching data from JSON source...")
 	// Add JSON fetch logic here
 	return req.JSONSourceData, nil
 }
@@ -29,7 +30,7 @@ func (j JSONDestination) SendData(data interface{}, req interfaces.Request) erro
 	if req.JSONOutputData == "" {
 		return errors.New("missing JSON destination data")
 	}
-	log.Println("Sending data to JSON destination...")
+	logger.Infof("Sending data to JSON destination...")
 	// Add JSON send logic here
 	return nil
 }

@@ -3,7 +3,8 @@ package integrations
 import (
 	"errors"
 	"io/ioutil"
-	"log"
+
+	"github.com/SkySingh04/fractal/logger"
 
 	"github.com/SkySingh04/fractal/interfaces"
 	"github.com/SkySingh04/fractal/registry"
@@ -25,7 +26,7 @@ func (y YAMLSource) FetchData(req interfaces.Request) (interface{}, error) {
 	if err := validateYAMLRequest(req, true); err != nil {
 		return nil, err
 	}
-	log.Println("Fetching data from YAML...")
+	logger.Infof("Fetching data from YAML...")
 	data, err := ioutil.ReadFile(req.YAMLSourceFilePath)
 	if err != nil {
 		return nil, err
@@ -43,7 +44,7 @@ func (y YAMLDestination) SendData(data interface{}, req interfaces.Request) erro
 	if err := validateYAMLRequest(req, false); err != nil {
 		return err
 	}
-	log.Println("Sending data to YAML...")
+	logger.Infof("Sending data to YAML...")
 	outputData, err := yaml.Marshal(data)
 	if err != nil {
 		return err
