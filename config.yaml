@@ -9,4 +9,4 @@ outputmethod: CSV
 transformations: |
     ADD_FIELD("processed_at", CURRENT_TIME())
 validations: |
-    FIELD("age") TYPE(INT) RANGE(18, 65)
+    FIELD("age") TYPE(INT) RANGE(30, 35)

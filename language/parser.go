@@ -2,7 +2,6 @@ package language
 
 import (
 	"errors"
-	"fmt"
 )
 
 // Node represents a node in the Abstract Syntax Tree (AST)
@@ -13,80 +12,38 @@ type Node struct {
 }
 
 // Parser for validation and transformation rules
-type Parser struct {
-	tokens []Token
-	pos    int
+type Parser struct{}
+
+// NewParser initializes a parser
+func NewParser() *Parser {
+	return &Parser{}
 }
 
-// NewParser initializes a parser with tokens
-func NewParser(tokens []Token) *Parser {
-	return &Parser{
-		tokens: tokens,
-		pos:    0,
+// ParseRules parses the parameters into an AST
+func (p *Parser) ParseRules(params []string) (*Node, error) {
+	if len(params) < 3 {
+		return nil, errors.New("insufficient parameters")
 	}
-}
 
-// ParseRules parses the tokens into an AST
-func (p *Parser) ParseRules() (*Node, error) {
 	root := &Node{Type: "ROOT", Children: []*Node{}}
 
-	for p.pos < len(p.tokens) {
-		node, err := p.parseExpression()
-		if err != nil {
-			return nil, err
+	for i := 0; i < len(params); i += 3 {
+		if i+2 >= len(params) {
+			return nil, errors.New("incomplete expression")
 		}
+
+		field := params[i]
+		condition := params[i+1]
+		value := params[i+2]
+
+		node := &Node{Type: "EXPRESSION", Children: []*Node{
+			{Type: "FIELD", Value: field},
+			{Type: "CONDITION", Value: condition},
+			{Type: "VALUE", Value: value},
+		}}
+
 		root.Children = append(root.Children, node)
 	}
 
 	return root, nil
-}
-
-func (p *Parser) parseExpression() (*Node, error) {
-	// Example rule: FIELD CONDITION VALUE [LOGICAL FIELD CONDITION VALUE]
-	field := p.consume(TokenField)
-	if field == nil {
-		return nil, errors.New("expected field")
-	}
-
-	condition := p.consume(TokenCondition)
-	if condition == nil {
-		return nil, fmt.Errorf("expected condition after field %s", field.Value)
-	}
-
-	value := p.consume(TokenValue)
-	if value == nil {
-		return nil, fmt.Errorf("expected value after condition %s", condition.Value)
-	}
-
-	node := &Node{Type: "EXPRESSION", Children: []*Node{
-		{Type: field.Type, Value: field.Value},
-		{Type: condition.Type, Value: condition.Value},
-		{Type: value.Type, Value: value.Value},
-	}}
-
-	// Check for logical operators (AND, OR, NOT)
-	logical := p.consume(TokenLogical)
-	if logical != nil {
-		rightExpr, err := p.parseExpression()
-		if err != nil {
-			return nil, err
-		}
-		node.Children = append(node.Children, &Node{
-			Type:     logical.Type,
-			Value:    logical.Value,
-			Children: []*Node{rightExpr},
-		})
-	}
-
-	return node, nil
-}
-
-// consume retrieves the next token if it matches the expected type
-func (p *Parser) consume(expected TokenType) *Token {
-	if p.pos < len(p.tokens) && p.tokens[p.pos].Type == expected {
-		token := p.tokens[p.pos]
-		p.pos++
-		return &token
-	}
-	return nil
 }

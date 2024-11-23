@@ -80,10 +80,25 @@ func main() {
 			logger.Fatalf("Missing 'outputconfig' in configuration")
 		}
 
+		if _, ok := configuration["errorhandling"]; !ok {
+
+			logger.Fatalf("Missing 'errorhandling' in configuration")
+		}
+		if _, ok := configuration["validations"]; !ok {
+			logger.Warnf("Missing 'validations' in configuration")
+		}
+
+		if _, ok := configuration["transformations"]; !ok {
+			logger.Warnf("Missing 'transformations' in configuration")
+		}
+
 		// logger.Infof("Configuration loaded successfully: %+v", configuration)
 
 		// Get the input and output methods from the configuration
 		inputMethod, inputconfig := configuration["inputMethod"], configuration["inputconfig"].(map[string]interface{})
+		inputconfig["validations"] = configuration["validations"]
+		inputconfig["transformations"] = configuration["transformations"]
+		inputconfig["errorhandling"] = configuration["errorhandling"]
 		outputMethod, outputconfig := configuration["outputMethod"], configuration["outputconfig"].(map[string]interface{})
 
 		// Fetch data from the input method
@@ -93,9 +108,10 @@ func main() {
 		}
 
 		// logger.Infof("Fetching data from %s...", inputMethod)
-		// logger.Infof("Input configuration: %+v", inputconfig)
+		logger.Infof("Input configuration: %+v", inputconfig)
 
 		inputRequest := mapConfigToRequest(inputconfig)
+		logger.Infof("Input request: %+v", inputRequest)
 		data, err := inputIntegration.FetchData(inputRequest)
 
 		if err != nil {
@@ -125,7 +141,20 @@ func main() {
 
 func getStringField(config map[string]interface{}, field string, defaultValue string) string {
 	if value, ok := config[field]; ok && value != nil {
-		return value.(string)
+		switch v := value.(type) {
+		case string:
+			return v
+		case map[string]interface{}:
+			// Extract "strategy" or similar key from nested map if applicable
+			if strategy, exists := v["strategy"]; exists {
+				return strategy.(string)
+			}
+			return fmt.Sprintf("%v", v) // Fallback for other maps
+		case []interface{}:
+			return fmt.Sprintf("%v", v)
+		default:
+			logger.Warnf("Unexpected type for field %s: %T", field, v)
+		}
 	}
 	return defaultValue
 }
@@ -135,6 +164,9 @@ func mapConfigToRequest(config map[string]interface{}) interfaces.Request {
 	return interfaces.Request{
 		Input:                   getStringField(config, "inputmethod", ""),
 		Output:                  getStringField(config, "outputmethod", ""),
+		ValidationRules:         getStringField(config, "validations", ""),
+		TransformationRules:     getStringField(config, "transformations", ""),
+		ErrorHandling:           getStringField(config, "errorhandling", ""),
 		RabbitMQInputURL:        getStringField(config, "url", ""),
 		RabbitMQInputQueueName:  getStringField(config, "queuename", ""),
 		RabbitMQOutputURL:       getStringField(config, "url", ""),
@@ -172,8 +204,8 @@ func mapConfigToRequest(config map[string]interface{}) interfaces.Request {
 		SFTPPassword:            getStringField(config, "password", ""),
 		WebSocketSourceURL:      getStringField(config, "url", ""),
 		WebSocketDestURL:        getStringField(config, "url", ""),
-		CredentialFileAddr: 	 getStringField(config, "credentialfileaddr", "firebaseConfig.json"),
-		Document: 			 	 getStringField(config, "document", "sampledata"),
-		Collection: 		 	 getStringField(config, "collection", "1"),
+		CredentialFileAddr:      getStringField(config, "credentialfileaddr", "firebaseConfig.json"),
+		Document:                getStringField(config, "document", "sampledata"),
+		Collection:              getStringField(config, "collection", "1"),
 	}
 }

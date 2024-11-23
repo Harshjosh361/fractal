@@ -5,7 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/SkySingh04/fractal/interfaces"
 	"github.com/SkySingh04/fractal/language"
@@ -80,6 +83,7 @@ func (r CSVSource) FetchData(req interfaces.Request) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+	logger.Infof("request: %v", req)
 
 	// Validate the data
 	validatedData, err := validateCSVData(data, req.ValidationRules)
@@ -119,31 +123,41 @@ func init() {
 
 // validateCSVData ensures the input data meets the required criteria using validation rules.
 func validateCSVData(data []byte, validationRules string) ([]byte, error) {
-	
-	logger.Infof("Validating data: %s", data)
+
+	// logger.Infof("Validating data: %s", data)
 
 	if len(data) == 0 {
 		return nil, errors.New("data is empty")
 	}
+	logger.Infof("validationRules: %s", validationRules)
 
 	// Initialize lexer and tokenize the validation rules
 	lexer := language.NewLexer(validationRules)
-	tokens, err := lexer.Tokenize()
+	tokens, err := lexer.Tokenize(validationRules)
 	if err != nil {
 		return nil, fmt.Errorf("failed to tokenize validation rules: %v", err)
 	}
+	logger.Infof("Tokens: %v", tokens)
 
 	// Parse the tokens into an AST
-	parser := language.NewParser(tokens)
-	rulesAST, err := parser.ParseRules()
+	parser := language.NewParser()
+	var tokenValues []string
+	for _, token := range tokens {
+		tokenValues = append(tokenValues, token.Value)
+	}
+	rulesAST, err := parser.ParseRules(tokenValues)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse validation rules: %v", err)
 	}
 
 	// Apply validation rules to data
 	records := strings.Split(strings.TrimSpace(string(data)), "\n")
+	logger.Infof("Validating %d records", len(records))
 	for _, record := range records {
+		logger.Infof("Validating record: %s", record)
+		logger.Infof("Number of validation rules: %d", len(rulesAST.Children))
 		for _, ruleNode := range rulesAST.Children {
+			logger.Infof("Applying rule: %s", ruleNode.Value)
 			err := applyValidationRule(record, ruleNode)
 			if err != nil {
 				return nil, err // Return the first validation error encountered
@@ -157,18 +171,22 @@ func validateCSVData(data []byte, validationRules string) ([]byte, error) {
 
 // transformCSVData modifies the input data as per business logic using transformation rules.
 func transformCSVData(data []byte, transformationRules string) ([]byte, error) {
-	logger.Infof("Transforming data: %s", data)
+	// logger.Infof("Transforming data: %s", data)
 
 	// Initialize lexer and tokenize the transformation rules
 	lexer := language.NewLexer(transformationRules)
-	tokens, err := lexer.Tokenize()
+	tokens, err := lexer.Tokenize(transformationRules)
 	if err != nil {
 		return nil, fmt.Errorf("failed to tokenize transformation rules: %v", err)
 	}
 
 	// Parse the tokens into an AST
-	parser := language.NewParser(tokens)
-	rulesAST, err := parser.ParseRules()
+	parser := language.NewParser()
+	var tokenValues []string
+	for _, token := range tokens {
+		tokenValues = append(tokenValues, token.Value)
+	}
+	rulesAST, err := parser.ParseRules(tokenValues)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse transformation rules: %v", err)
 	}
@@ -192,10 +210,195 @@ func transformCSVData(data []byte, transformationRules string) ([]byte, error) {
 
 // applyValidationRule processes a single record against a validation rule AST node.
 func applyValidationRule(record string, ruleNode *language.Node) error {
-	// Implementation details based on your business rules
-	// Validate the record using the information from ruleNode
-	// Example: Check if a specific field meets the condition
-	return nil // Replace with actual validation logic
+	// Split the record into fields (assuming CSV format)
+	fields := strings.Split(record, ",")
+	fieldMap := map[string]string{}
+
+	// Map field names to their values based on index (assuming header order)
+	// READ the first line of the CSV file to get the headers
+	headers := strings.Split(fields[0], ",")
+	for i, header := range headers {
+		if i < len(fields) {
+			fieldMap[header] = strings.TrimSpace(fields[i])
+		}
+	}
+
+	// Evaluate the ruleNode recursively
+	logger.Infof("Evaluating rule: %s", ruleNode.Value)
+	if err := evaluateNode(ruleNode, fieldMap); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Recursive function to evaluate nodes
+func evaluateNode(node *language.Node, fieldMap map[string]string) error {
+	switch node.Type {
+	case language.TokenField:
+		return nil // This case is handled within expressions
+
+	case "EXPRESSION":
+		fieldNode := node.Children[0]
+		conditionNode := node.Children[1]
+		valueNode := node.Children[2]
+
+		fieldValue, exists := fieldMap[fieldNode.Value]
+		if !exists {
+			return fmt.Errorf("field %s not found", fieldNode.Value)
+		}
+
+		switch conditionNode.Value {
+		case "TYPE":
+			return evaluateTypeCondition(fieldValue, valueNode.Value)
+		case "RANGE":
+			return evaluateRangeCondition(fieldValue, valueNode.Children)
+		case "MATCHES":
+			return evaluateRegexCondition(fieldValue, valueNode.Value)
+		case "IN":
+			return evaluateInCondition(fieldValue, valueNode.Children)
+		case "REQUIRED":
+			return evaluateRequiredCondition(fieldValue)
+		default:
+			return fmt.Errorf("unsupported condition: %s", conditionNode.Value)
+		}
+
+	case language.TokenLogical:
+		return evaluateLogicalCondition(node, fieldMap)
+	}
+
+	return fmt.Errorf("unknown node type: %s", node.Type)
+}
+func evaluateTypeCondition(value, expectedType string) error {
+	switch expectedType {
+	case "STRING":
+		return nil // All values are strings by default
+	case "INT":
+		if _, err := strconv.Atoi(value); err != nil {
+			return fmt.Errorf("value '%s' is not an integer", value)
+		}
+	case "FLOAT":
+		if _, err := strconv.ParseFloat(value, 64); err != nil {
+			return fmt.Errorf("value '%s' is not a float", value)
+		}
+	case "BOOL":
+		if _, err := strconv.ParseBool(value); err != nil {
+			return fmt.Errorf("value '%s' is not a boolean", value)
+		}
+	case "DATE":
+		if _, err := time.Parse("2006-01-02", value); err != nil {
+			return fmt.Errorf("value '%s' is not a valid date", value)
+		}
+	default:
+		return fmt.Errorf("unknown type: %s", expectedType)
+	}
+	return nil
+}
+func evaluateRangeCondition(value string, rangeNodes []*language.Node) error {
+	val, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		return fmt.Errorf("value '%s' is not numeric", value)
+	}
+
+	min, err := strconv.ParseFloat(rangeNodes[0].Value, 64)
+	if err != nil {
+		return fmt.Errorf("invalid minimum range value: %v", err)
+	}
+	max, err := strconv.ParseFloat(rangeNodes[1].Value, 64)
+	if err != nil {
+		return fmt.Errorf("invalid maximum range value: %v", err)
+	}
+
+	if val < min || val > max {
+		return fmt.Errorf("value '%s' out of range (%f, %f)", value, min, max)
+	}
+	return nil
+}
+func evaluateRegexCondition(value, pattern string) error {
+	matched, err := regexp.MatchString(pattern, value)
+	if err != nil || !matched {
+		return fmt.Errorf("value '%s' does not match pattern", value)
+	}
+	return nil
+}
+func evaluateInCondition(value string, allowedValues []*language.Node) error {
+	for _, valNode := range allowedValues {
+		if value == valNode.Value {
+			return nil
+		}
+	}
+	return fmt.Errorf("value '%s' not in allowed list", value)
+}
+func evaluateRequiredCondition(value string) error {
+	if strings.TrimSpace(value) == "" {
+		return errors.New("field is required and cannot be empty")
+	}
+	return nil
+}
+
+func evaluateLogicalCondition(node *language.Node, fieldMap map[string]string) error {
+	leftErr := evaluateNode(node.Children[0], fieldMap)
+	rightErr := evaluateNode(node.Children[1], fieldMap)
+
+	switch node.Value {
+	case "AND":
+		if leftErr != nil || rightErr != nil {
+			return errors.New("AND condition failed")
+		}
+	case "OR":
+		if leftErr != nil && rightErr != nil {
+			return errors.New("OR condition failed")
+		}
+	case "NOT":
+		if leftErr == nil {
+			return errors.New("NOT condition failed")
+		}
+	default:
+		return fmt.Errorf("unknown logical operator: %s", node.Value)
+	}
+	return nil
+}
+
+// Evaluate individual condition (fieldValue compared to ruleValue)
+func evaluateCondition(fieldValue, operator, ruleValue string) error {
+	switch operator {
+	case "==":
+		if fieldValue != ruleValue {
+			return fmt.Errorf("expected %s, got %s", ruleValue, fieldValue)
+		}
+	case "!=":
+		if fieldValue == ruleValue {
+			return fmt.Errorf("field value should not be %s", ruleValue)
+		}
+	case ">":
+		fieldNum, err1 := strconv.ParseFloat(fieldValue, 64)
+		ruleNum, err2 := strconv.ParseFloat(ruleValue, 64)
+		if err1 != nil || err2 != nil || fieldNum <= ruleNum {
+			return fmt.Errorf("expected greater than %s, got %s", ruleValue, fieldValue)
+		}
+	case "<":
+		fieldNum, err1 := strconv.ParseFloat(fieldValue, 64)
+		ruleNum, err2 := strconv.ParseFloat(ruleValue, 64)
+		if err1 != nil || err2 != nil || fieldNum >= ruleNum {
+			return fmt.Errorf("expected less than %s, got %s", ruleValue, fieldValue)
+		}
+	case ">=":
+		fieldNum, err1 := strconv.ParseFloat(fieldValue, 64)
+		ruleNum, err2 := strconv.ParseFloat(ruleValue, 64)
+		if err1 != nil || err2 != nil || fieldNum < ruleNum {
+			return fmt.Errorf("expected greater than or equal to %s, got %s", ruleValue, fieldValue)
+		}
+	case "<=":
+		fieldNum, err1 := strconv.ParseFloat(fieldValue, 64)
+		ruleNum, err2 := strconv.ParseFloat(ruleValue, 64)
+		if err1 != nil || err2 != nil || fieldNum > ruleNum {
+			return fmt.Errorf("expected less than or equal to %s, got %s", ruleValue, fieldValue)
+		}
+
+	default:
+		return fmt.Errorf("unsupported operator %s", operator)
+	}
+	return nil
 }
 
 // applyTransformationRule processes a single record against a transformation rule AST node.

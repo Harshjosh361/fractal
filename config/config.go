@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/SkySingh04/fractal/logger"
 	"github.com/SkySingh04/fractal/registry"
 	"github.com/manifoldco/promptui"
 	"github.com/spf13/viper"
@@ -60,11 +61,12 @@ func LoadConfig(configFile string) (map[string]interface{}, error) {
 		"outputMethod":    viper.GetString("outputMethod"),
 		"inputconfig":     viper.GetStringMap("inputconfig"),
 		"outputconfig":    viper.GetStringMap("outputconfig"),
-		"errorhandling":   viper.GetStringMap("errorhandling"),
-		"validations":     viper.GetStringMap("validations"),
-		"transformations": viper.GetStringMap("transformations"),
+		"errorhandling":   viper.GetStringMap("errorhandling"), // Keep this as a map if it contains structured data
+		"validations":     viper.GetString("validations"),      // Changed to GetString
+		"transformations": viper.GetString("transformations"),  // Changed to GetString
 	}
 
+	logger.Infof("Configuration loaded from %s", configFile)
 	return config, nil
 }
 

@@ -41,37 +41,34 @@ func NewLexer(input string) *Lexer {
 }
 
 // Tokenize splits the input into tokens
-func (l *Lexer) Tokenize() ([]Token, error) {
+func (l *Lexer) Tokenize(input string) ([]Token, error) {
 	var tokens []Token
+	pos := 0
 	patterns := map[TokenType]*regexp.Regexp{
-		TokenField:     regexp.MustCompile(`^[a-zA-Z0-9_\.]+`),         // Matches field names
-		TokenCondition: regexp.MustCompile(`^(==|!=|>=|<=|>|<)`),       // Matches conditions
-		TokenOperator:  regexp.MustCompile(`^(->|=>)`),                 // Matches transformation operators
-		TokenValue:     regexp.MustCompile(`^"([^"]*)"|'([^']*)'|\d+`), // Matches strings or numbers
-		TokenLogical:   regexp.MustCompile(`^(AND|OR|NOT)`),            // Matches logical operators
-		TokenSeparator: regexp.MustCompile(`^,`),                       // Matches separators
-		TokenTransform: regexp.MustCompile(`^TRANSFORM\(`),             // Matches the transform keyword
+		TokenField:     regexp.MustCompile(`^FIELD\("([^"]+)"\)`),                    // Match FIELD("field_name")
+		TokenCondition: regexp.MustCompile(`^(TYPE|RANGE|MATCHES|IN|REQUIRED)`),      // Custom conditions
+		TokenValue:     regexp.MustCompile(`^"([^"]*)"|'([^']*)'|[\d\.]+|\([^)]*\)`), // Match strings, numbers, lists
+		TokenLogical:   regexp.MustCompile(`^(AND|OR|NOT)`),                          // Logical operators
+		TokenSeparator: regexp.MustCompile(`^,`),                                     // Separators
 	}
 
-	for l.pos < len(l.input) {
-		// Skip whitespace
-		l.input = strings.TrimSpace(l.input[l.pos:])
-		l.pos = 0
+	for pos < len(input) {
+		input = strings.TrimSpace(input[pos:])
+		pos = 0
 
 		matched := false
 		for tokenType, pattern := range patterns {
-			loc := pattern.FindStringIndex(l.input)
-			if loc != nil && loc[0] == 0 {
-				value := l.input[loc[0]:loc[1]]
+			if loc := pattern.FindStringIndex(input); loc != nil && loc[0] == 0 {
+				value := input[loc[0]:loc[1]]
 				tokens = append(tokens, Token{Type: tokenType, Value: value})
-				l.pos += len(value)
+				pos += len(value)
 				matched = true
 				break
 			}
 		}
 
 		if !matched {
-			return nil, fmt.Errorf("unexpected token at: %s", l.input)
+			return nil, fmt.Errorf("unexpected token at: %s", input)
 		}
 	}
 
