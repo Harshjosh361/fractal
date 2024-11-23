@@ -1,18 +1,16 @@
 package tests
 
 import (
-	"testing"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
+	"context"
+	"fmt"
 	"github.com/SkySingh04/fractal/integrations"
 	"github.com/SkySingh04/fractal/interfaces"
 	"github.com/golang/mock/gomock"
-	"context"
-	"fmt"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"testing"
 	"time" // Import the time package
 )
-
-
 
 type MockFirestoreClient struct {
 	mock.Mock
@@ -85,7 +83,7 @@ func TestFetchData(t *testing.T) {
 
 	// Assert that the data is of type map[string]interface{}
 	resultData, ok := data.(map[string]interface{})
-	
+
 	if assert.True(t, ok) {
 		fmt.Printf("%s Data type validation passed\n", GreenTick)
 	} else {

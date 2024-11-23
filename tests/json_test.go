@@ -13,6 +13,11 @@ import (
 )
 
 func TestJSONIntegration(t *testing.T) {
+	const (
+		GreenTick = "\033[32m✔\033[0m" // Green tick
+		RedCross  = "\033[31m✘\033[0m" // Red cross
+	)
+	
 	// Setup
 	inputJSON := `{"name": "John", "age": 25, "city": "New York"}`
 	expectedOutputJSON := map[string]interface{}{
