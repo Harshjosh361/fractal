@@ -1,6 +1,0 @@
-inputconfig:
-    csvsourcefilename: sample.csv
-inputmethod: CSV
-outputconfig:
-    csvdestinationfilename: samplenew.csv
-outputmethod: CSV
