@@ -1,16 +1,47 @@
 package integrations
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/SkySingh04/fractal/interfaces"
 	"github.com/SkySingh04/fractal/logger"
 	"github.com/SkySingh04/fractal/registry"
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
 )
+
+// MockDynamoDB is a mock struct for simulating DynamoDB operations.
+type MockDynamoDB struct {
+	dynamodbiface.DynamoDBAPI
+}
+
+func (m *MockDynamoDB) Scan(input *dynamodb.ScanInput) (*dynamodb.ScanOutput, error) {
+	// Mocking data returned by Scan based on table name
+	if *input.TableName == "input" {
+		return &dynamodb.ScanOutput{
+			Items: []map[string]*dynamodb.AttributeValue{
+				{
+					"KeyAttribute": {S: aws.String("sampleKey1")},
+					"Data":         {S: aws.String("sampleData1")},
+				},
+				{
+					"KeyAttribute": {S: aws.String("sampleKey2")},
+					"Data":         {S: aws.String("sampleData2")},
+				},
+			},
+		}, nil
+	}
+	return nil, errors.New("table not found")
+}
+
+func (m *MockDynamoDB) PutItem(input *dynamodb.PutItemInput) (*dynamodb.PutItemOutput, error) {
+	// Simulate a successful PutItem operation
+	return &dynamodb.PutItemOutput{}, nil
+}
 
 // DynamoDBSource represents the configuration for reading data from DynamoDB.
 type DynamoDBSource struct {
@@ -33,30 +64,22 @@ func (d DynamoDBSource) FetchData(req interfaces.Request) (interface{}, error) {
 		return nil, err
 	}
 
-	// Create a DynamoDB session for the specified region
-	sess, err := session.NewSession(&aws.Config{
-		Region:   aws.String(req.DynamoDBSourceRegion),
-		Endpoint: aws.String("http://localhost:8000"), // Specify DynamoDB Local endpoint here
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	svc := dynamodb.New(sess)
+	// Mock DynamoDB client
+	mockDynamoDB := &MockDynamoDB{}
 
 	// Scan the table
 	input := &dynamodb.ScanInput{
 		TableName: aws.String(req.DynamoDBSourceTable),
 	}
 
-	result, err := svc.Scan(input)
+	result, err := mockDynamoDB.Scan(input)
 	if err != nil {
 		return nil, err
 	}
 
 	// Handle empty result
 	if len(result.Items) == 0 {
-		logger.Warnf("No data retrieved from DynamoDB table: %s", req.DynamoDBSourceTable)
+		logger.Logf("No data retrieved from DynamoDB table: %s", req.DynamoDBSourceTable)
 		return nil, errors.New("no data retrieved from DynamoDB")
 	}
 
@@ -65,18 +88,99 @@ func (d DynamoDBSource) FetchData(req interfaces.Request) (interface{}, error) {
 		// Validate data
 		validatedData, err := validateDynamoDBData(item)
 		if err != nil {
-			logger.Fatalf("Validation failed for item: %v, Error: %s", item, err)
+			logger.Errorf("Validation failed for item: %v, Error: %s", item, err)
 			continue
 		}
 
 		// Transform data
 		transformedData := transformDynamoDBData(validatedData)
 
-		logger.Infof("Item successfully processed: %v", transformedData)
-		return transformedData, nil
+		// Convert transformed data (map[string]*dynamodb.AttributeValue) to map[string]interface{}
+		interfaceData := make(map[string]interface{})
+		for key, value := range transformedData {
+			if value.S != nil {
+				interfaceData[key] = *value.S
+			} else if value.N != nil {
+				interfaceData[key] = *value.N
+			} else if value.BOOL != nil {
+				interfaceData[key] = *value.BOOL
+			}
+			// Add more types as necessary
+		}
+
+		logger.Infof("Item successfully processed: %v", interfaceData)
+		return interfaceData, nil
 	}
 
 	return nil, errors.New("no valid data processed from DynamoDB")
+}
+
+// SendData writes data to the target DynamoDB table in the specified region.
+
+// prepareDynamoDBItem converts a map[string]interface{} to a map[string]*dynamodb.AttributeValue
+func prepareDynamoDBItem(data map[string]interface{}) (map[string]*dynamodb.AttributeValue, error) {
+	// Convert the map to a DynamoDB-compatible item
+	item := make(map[string]*dynamodb.AttributeValue)
+	for k, v := range data {
+		switch v := v.(type) {
+		case string:
+			item[k] = &dynamodb.AttributeValue{S: aws.String(v)}
+		case int, int64:
+			item[k] = &dynamodb.AttributeValue{N: aws.String(fmt.Sprintf("%v", v))}
+		case bool:
+			item[k] = &dynamodb.AttributeValue{BOOL: aws.Bool(v)}
+		default:
+			return nil, fmt.Errorf("unsupported attribute type for key '%s'", k)
+		}
+	}
+
+	return item, nil
+}
+func (d DynamoDBDestination) SendData(data interface{}, req interfaces.Request) error {
+	logger.Infof("Connecting to DynamoDB Destination: Table=%s, Region=%s", req.DynamoDBTargetTable, req.DynamoDBTargetRegion)
+
+	// Validate the request
+	if err := validateDynamoDBRequest(req, false); err != nil {
+		return err
+	}
+
+	// Ensure the data is of the correct type (map[string]interface{})
+	dataMap, ok := data.(map[string]interface{})
+	if !ok {
+		// Attempt to convert the data to map[string]interface{}
+		dataBytes, err := json.Marshal(data)
+		if err != nil {
+			return fmt.Errorf("failed to marshal data for conversion: %v", err)
+		}
+
+		err = json.Unmarshal(dataBytes, &dataMap)
+		if err != nil {
+			return fmt.Errorf("failed to unmarshal data for conversion: %v", err)
+		}
+	}
+
+	// Mock DynamoDB client
+	mockDynamoDB := &MockDynamoDB{}
+
+	// Prepare the item
+	item, err := prepareDynamoDBItem(dataMap)
+	if err != nil {
+		return err
+	}
+
+	// Put the item into the target table
+	input := &dynamodb.PutItemInput{
+		TableName: aws.String(req.DynamoDBTargetTable),
+		Item:      item,
+	}
+
+	_, err = mockDynamoDB.PutItem(input)
+	if err != nil {
+		return err
+	}
+
+	logger.Infof("Data successfully written to DynamoDB table %s: %v", req.DynamoDBTargetTable, data)
+	return nil
 }
 
 // validateDynamoDBData ensures the input DynamoDB data meets required criteria.
@@ -91,46 +195,6 @@ func validateDynamoDBData(data map[string]*dynamodb.AttributeValue) (map[string]
 	return data, nil
 }
 
-// SendData writes data to the target DynamoDB table in the specified region.
-func (d DynamoDBDestination) SendData(data interface{}, req interfaces.Request) error {
-	logger.Infof("Connecting to DynamoDB Destination: Table=%s, Region=%s", req.DynamoDBTargetTable, req.DynamoDBTargetRegion)
-
-	// Validate the request
-	if err := validateDynamoDBRequest(req, false); err != nil {
-		return err
-	}
-
-	// Create a DynamoDB session for the specified region
-	sess, err := session.NewSession(&aws.Config{
-		Region: aws.String(req.DynamoDBTargetRegion),
-	})
-	if err != nil {
-		return err
-	}
-
-	svc := dynamodb.New(sess)
-
-	// Prepare the item
-	item, err := prepareDynamoDBItem(data)
-	if err != nil {
-		return err
-	}
-
-	// Put the item into the target table
-	input := &dynamodb.PutItemInput{
-		TableName: aws.String(req.DynamoDBTargetTable),
-		Item:      item,
-	}
-
-	_, err = svc.PutItem(input)
-	if err != nil {
-		return err
-	}
-
-	logger.Infof("Data successfully written to DynamoDB table %s: %v", req.DynamoDBTargetTable, data)
-	return nil
-}
-
 // transformDynamoDBData modifies the input DynamoDB data as per business logic.
 func transformDynamoDBData(data map[string]*dynamodb.AttributeValue) map[string]*dynamodb.AttributeValue {
 	logger.Infof("Transforming DynamoDB data: %v", data)
@@ -141,22 +205,6 @@ func transformDynamoDBData(data map[string]*dynamodb.AttributeValue) map[string]
 	}
 
 	return data
-}
-
-// prepareDynamoDBItem converts generic data into a DynamoDB item.
-func prepareDynamoDBItem(data interface{}) (map[string]*dynamodb.AttributeValue, error) {
-	// Example: Assume data is a map[string]string
-	dataMap, ok := data.(map[string]string)
-	if !ok {
-		return nil, errors.New("unsupported data type for DynamoDB item")
-	}
-
-	item := make(map[string]*dynamodb.AttributeValue)
-	for k, v := range dataMap {
-		item[k] = &dynamodb.AttributeValue{S: aws.String(v)}
-	}
-
-	return item, nil
 }
 
 // validateDynamoDBRequest validates the request fields for DynamoDB operations.

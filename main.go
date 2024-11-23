@@ -171,5 +171,8 @@ func mapConfigToRequest(config map[string]interface{}) interfaces.Request {
 		SFTPPassword:            getStringField(config, "password", ""),
 		WebSocketSourceURL:      getStringField(config, "url", ""),
 		WebSocketDestURL:        getStringField(config, "url", ""),
+		CredentialFileAddr: 	 getStringField(config, "credentialfileaddr", "firebaseConfig.json"),
+		Document: 			 	 getStringField(config, "document", "sampledata"),
+		Collection: 		 	 getStringField(config, "collection", "1"),
 	}
 }

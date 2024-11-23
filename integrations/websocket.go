@@ -2,74 +2,121 @@ package integrations
 
 import (
 	"errors"
-
-	"github.com/SkySingh04/fractal/logger"
+	"strings"
 
 	"github.com/SkySingh04/fractal/interfaces"
+	"github.com/SkySingh04/fractal/logger"
 	"github.com/SkySingh04/fractal/registry"
 	"github.com/gorilla/websocket"
 )
 
-// WebSocketSource implements the DataSource interface
+// WebSocketSource struct represents the configuration for consuming messages from WebSocket.
 type WebSocketSource struct {
-	URL string `json:"url"`
+	URL string `json:"websocket_source_url"`
 }
 
-// WebSocketDestination implements the DataDestination interface
+// WebSocketDestination struct represents the configuration for publishing messages to WebSocket.
 type WebSocketDestination struct {
-	URL string `json:"url"`
+	URL string `json:"websocket_dest_url"`
 }
 
-// FetchData fetches data from a WebSocket server
-func (w WebSocketSource) FetchData(req interfaces.Request) (interface{}, error) {
-	if err := validateWebSocketRequest(req, true); err != nil {
-		return nil, err
+// FetchData connects to WebSocket, retrieves data, and passes it through validation and transformation pipelines.
+func (ws WebSocketSource) FetchData(req interfaces.Request) (interface{}, error) {
+	logger.Infof("Connecting to WebSocket Source: URL=%s", req.WebSocketSourceURL)
+
+	if req.WebSocketSourceURL == "" {
+		return nil, errors.New("missing WebSocket source details")
 	}
-	logger.Infof("Fetching data from WebSocket...")
+
+	// Connect to WebSocket server
 	conn, _, err := websocket.DefaultDialer.Dial(req.WebSocketSourceURL, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer conn.Close()
-	// Receive data from WebSocket
-	_, message, err := conn.ReadMessage()
+
+	// Read message from WebSocket
+	_, msg, err := conn.ReadMessage()
 	if err != nil {
 		return nil, err
 	}
-	return string(message), nil
+
+	logger.Infof("Message received from WebSocket: %s", msg)
+
+	// Validation
+	validatedData, err := validateWebSocketData(msg)
+	if err != nil {
+		logger.Fatalf("Validation failed for message: %s, Error: %s", msg, err)
+		return nil, err
+	}
+
+	// Transformation
+	transformedData := transformWebSocketData(validatedData)
+
+	logger.Infof("Message successfully processed and routed: %s", transformedData)
+	return transformedData, nil
 }
 
-// SendData sends data to a WebSocket server
-func (w WebSocketDestination) SendData(data interface{}, req interfaces.Request) error {
-	if err := validateWebSocketRequest(req, false); err != nil {
-		return err
+// SendData connects to WebSocket and publishes data to the specified WebSocket server.
+func (ws WebSocketDestination) SendData(data interface{}, req interfaces.Request) error {
+	logger.Infof("Connecting to WebSocket Destination: URL=%s", req.WebSocketDestURL)
+
+	if req.WebSocketDestURL == "" {
+		return errors.New("missing WebSocket destination details")
 	}
-	logger.Infof("Sending data to WebSocket...")
+
+	// Connect to WebSocket server
 	conn, _, err := websocket.DefaultDialer.Dial(req.WebSocketDestURL, nil)
 	if err != nil {
 		return err
 	}
 	defer conn.Close()
-	// Send data to WebSocket
-	err = conn.WriteMessage(websocket.TextMessage, []byte(data.(string)))
+
+	// Convert data to string if necessary
+	var msg string
+	switch v := data.(type) {
+	case string:
+		msg = v
+	case []byte:
+		msg = string(v)
+	default:
+		return errors.New("data should be a string or byte slice to send over WebSocket")
+	}
+
+	// Send the message to WebSocket
+	err = conn.WriteMessage(websocket.TextMessage, []byte(msg))
 	if err != nil {
 		return err
 	}
+
+	logger.Infof("Message sent to WebSocket server: %s", msg)
 	return nil
 }
 
-// validateWebSocketRequest validates the request fields for WebSocket
-func validateWebSocketRequest(req interfaces.Request, isSource bool) error {
-	if isSource && req.WebSocketSourceURL == "" {
-		return errors.New("missing WebSocket source URL")
-	}
-	if !isSource && req.WebSocketDestURL == "" {
-		return errors.New("missing WebSocket destination URL")
-	}
-	return nil
-}
-
+// Initialize the WebSocket integrations by registering them with the registry.
 func init() {
 	registry.RegisterSource("WebSocket", WebSocketSource{})
 	registry.RegisterDestination("WebSocket", WebSocketDestination{})
+}
+
+// validateWebSocketData ensures the input data meets the required criteria.
+func validateWebSocketData(data []byte) ([]byte, error) {
+	logger.Infof("Validating data: %s", data)
+
+	// Example: Check if data is non-empty
+	if len(data) == 0 {
+		return nil, errors.New("data is empty")
+	}
+
+	// Add custom validation logic here
+	return data, nil
+}
+
+// transformWebSocketData modifies the input data as per business logic.
+func transformWebSocketData(data []byte) []byte {
+	logger.Infof("Transforming data: %s", data)
+
+	// Example: Convert data to uppercase (modify as needed)
+	transformed := []byte(strings.ToUpper(string(data)))
+	return transformed
 }

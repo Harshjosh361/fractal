@@ -1,12 +1,6 @@
 inputconfig:
-    ftpfilepath: /home/testuser/testfile.txt
-    password: testpass
-    url: ftp://localhost:21
-    user: testuser
-inputmethod: FTP
+    url: wss://echo.websocket.org
+inputmethod: WebSocket
 outputconfig:
-    ftpfilepath: /home/testuser/output.txt
-    password: testpass
-    url: ftp://localhost:21
-    user: testuser
-outputmethod: FTP
+    url: wss://echo.websocket.org
+outputmethod: WebSocket

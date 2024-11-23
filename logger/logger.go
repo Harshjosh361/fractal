@@ -22,9 +22,7 @@ func Errorf(format string, args ...any) {
 	logger.Fatalf("[ERROR] "+format, args...)
 }
 
-
 func Warnf(format string, args ...any) {
 	logger := gofr.New().Logger()
 	logger.Fatalf("[WARN] "+format, args...)
 }
-
