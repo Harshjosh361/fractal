@@ -1,8 +1,6 @@
 package tests
 
 import (
-	"fmt"
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -13,7 +11,7 @@ import (
 )
 
 func createTempYAMLFile(content string) (string, error) {
-	tmpFile, err := ioutil.TempFile("", "*.yaml")
+	tmpFile, err := os.CreateTemp("", "*.yaml")
 	if err != nil {
 		return "", err
 	}
@@ -28,11 +26,14 @@ func createTempYAMLFile(content string) (string, error) {
 }
 
 func TestYAMLIntegration(t *testing.T) {
+	greenTick := "\033[32m✔\033[0m" // Green tick
+	redCross := "\033[31m✘\033[0m"  // Red cross
+
 	logTestStatus := func(description string, err error) {
 		if err == nil {
-			fmt.Printf("✅ %s\n", description)
+			t.Logf("%s %s", greenTick, description)
 		} else {
-			fmt.Printf("❌ %s: %v\n", description, err)
+			t.Logf("%s %s: %v", redCross, description, err)
 		}
 	}
 
@@ -74,7 +75,7 @@ skills:
 	assert.NoError(t, err, "SendData failed")
 
 	// Verify written data
-	writtenData, err := ioutil.ReadFile(destinationFilePath)
+	writtenData, err := os.ReadFile(destinationFilePath)
 	logTestStatus("Read data from YAML destination file", err)
 	assert.NoError(t, err, "Failed to read destination file")
 	defer os.Remove(destinationFilePath)
@@ -85,15 +86,27 @@ skills:
 	assert.NoError(t, err, "Unmarshalling written YAML failed")
 
 	// Validate content
-	assert.Equal(t, "TestUser", result["name"], "Name should match")
-	logTestStatus("Validate 'name' field", nil)
+	if assert.Equal(t, "TestUser", result["name"], "Name should match") {
+		logTestStatus("Validate 'name' field", nil)
+	} else {
+		logTestStatus("Validate 'name' field", assert.AnError)
+	}
 
-	assert.Equal(t, 30, result["age"], "Age should match")
-	logTestStatus("Validate 'age' field", nil)
+	if assert.Equal(t, 30, result["age"], "Age should match") {
+		logTestStatus("Validate 'age' field", nil)
+	} else {
+		logTestStatus("Validate 'age' field", assert.AnError)
+	}
 
-	assert.Equal(t, []interface{}{"Go", "Kubernetes"}, result["skills"], "Skills should match")
-	logTestStatus("Validate 'skills' field", nil)
+	if assert.Equal(t, []interface{}{"Go", "Kubernetes"}, result["skills"], "Skills should match") {
+		logTestStatus("Validate 'skills' field", nil)
+	} else {
+		logTestStatus("Validate 'skills' field", assert.AnError)
+	}
 
-	assert.Equal(t, true, result["transformed"], "Expected 'transformed' key in output")
-	logTestStatus("Validate 'transformed' key in output", nil)
+	if assert.Equal(t, true, result["transformed"], "Expected 'transformed' key in output") {
+		logTestStatus("Validate 'transformed' key in output", nil)
+	} else {
+		logTestStatus("Validate 'transformed' key in output", assert.AnError)
+	}
 }
