@@ -65,7 +65,7 @@ func (d DynamoDBSource) FetchData(req interfaces.Request) (interface{}, error) {
 		// Validate data
 		validatedData, err := validateDynamoDBData(item)
 		if err != nil {
-			logger.Errorf("Validation failed for item: %v, Error: %s", item, err)
+			logger.Fatalf("Validation failed for item: %v, Error: %s", item, err)
 			continue
 		}
 

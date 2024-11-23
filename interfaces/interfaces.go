@@ -31,8 +31,8 @@ type Request struct {
 	RabbitMQOutputURL       string `json:"rabbitmq_output_url"`        // URL for RabbitMQ (producer)
 	RabbitMQOutputQueueName string `json:"rabbitmq_output_queue_name"` // Queue name for RabbitMQ output
 	// JSON
-	JSONSourceData string `json:"json_source_data"` // JSON source data (raw or file path)
-	JSONOutputData string `json:"json_output_data"` // JSON output data (raw or file path)
+	JSONSourceData     string `json:"json_source_data"`     // JSON source data (raw or file path)
+	JSONOutputFilename string `json:"json_output_filename"` // JSON output data (raw or file path)
 	// YAML
 	YAMLSourceFilePath      string `json:"yaml_source_file_path"`      // Source YAML file path
 	YAMLDestinationFilePath string `json:"yaml_destination_file_path"` // Destination YAML file path
