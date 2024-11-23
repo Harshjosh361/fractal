@@ -11,21 +11,23 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// YAMLSource struct represents the configuration for reading data from a YAML file.
 type YAMLSource struct {
 	FilePath string `json:"yaml_source_file_path"`
 }
 
+// YAMLDestination struct represents the configuration for writing data to a YAML file.
 type YAMLDestination struct {
 	FilePath string `json:"yaml_output_file_path"`
 }
 
-// FetchData retrieves and processes YAML source data
+// FetchData reads and processes data from a YAML source file.
 func (y YAMLSource) FetchData(req interfaces.Request) (interface{}, error) {
+	logger.Infof("Fetching data from YAML source: %s", req.YAMLSourceFilePath)
+
 	if req.YAMLSourceFilePath == "" {
 		return nil, errors.New("missing YAML source file path")
 	}
-
-	logger.Infof("Fetching data from YAML source: %s", req.YAMLSourceFilePath)
 
 	// Read the YAML file
 	data, err := ioutil.ReadFile(req.YAMLSourceFilePath)
@@ -33,14 +35,14 @@ func (y YAMLSource) FetchData(req interfaces.Request) (interface{}, error) {
 		return nil, err
 	}
 
-	// Validate and sanitize YAML data
+	// Validate and sanitize the YAML data
 	validatedData, err := ValidateYAMLData(data)
 	if err != nil {
 		logger.Fatalf("Validation error: %v", err)
 		return nil, err
 	}
 
-	// Transform YAML data
+	// Transform the YAML data if necessary
 	transformedData, err := transformYAMLData(validatedData)
 	if err != nil {
 		logger.Fatalf("Transformation error: %v", err)
@@ -50,13 +52,13 @@ func (y YAMLSource) FetchData(req interfaces.Request) (interface{}, error) {
 	return transformedData, nil
 }
 
-// SendData writes data to a YAML destination file
+// SendData writes the provided data to a YAML destination file.
 func (y YAMLDestination) SendData(data interface{}, req interfaces.Request) error {
+	logger.Infof("Sending data to YAML destination: %s", req.YAMLDestinationFilePath)
+
 	if req.YAMLDestinationFilePath == "" {
 		return errors.New("missing YAML destination file path")
 	}
-
-	logger.Infof("Sending data to YAML destination: %s", req.YAMLDestinationFilePath)
 
 	// Write the data to the YAML file
 	err := writeYAMLFile(req.YAMLDestinationFilePath, data)
@@ -69,20 +71,20 @@ func (y YAMLDestination) SendData(data interface{}, req interfaces.Request) erro
 	return nil
 }
 
-// ValidateYAMLData validates, sanitizes, and unmarshals YAML data
+// ValidateYAMLData unmarshals and validates the YAML data.
 func ValidateYAMLData(data []byte) (interface{}, error) {
 	var yamlData interface{}
 	if err := yaml.Unmarshal(data, &yamlData); err != nil {
 		return nil, errors.New("invalid YAML format")
 	}
 
-	// Sanitize the YAML data
+	// Sanitize the data
 	sanitizedData := sanitizeYAMLData(yamlData)
 	logger.Infof("Validation and sanitization successful for YAML data")
 	return sanitizedData, nil
 }
 
-// sanitizeYAMLData recursively sanitizes the YAML data to ensure consistency
+// sanitizeYAMLData recursively sanitizes the YAML data to ensure consistency.
 func sanitizeYAMLData(data interface{}) interface{} {
 	switch v := data.(type) {
 	case map[string]interface{}:
@@ -110,7 +112,7 @@ func sanitizeYAMLData(data interface{}) interface{} {
 	}
 }
 
-// writeYAMLFile writes the provided data to a YAML file with proper formatting
+// writeYAMLFile writes the provided data to a YAML file.
 func writeYAMLFile(filename string, data interface{}) error {
 	outputData, err := yaml.Marshal(data)
 	if err != nil {
@@ -125,7 +127,7 @@ func writeYAMLFile(filename string, data interface{}) error {
 	return nil
 }
 
-// transformYAMLData applies transformations to the YAML data
+// transformYAMLData applies transformations to the YAML data.
 func transformYAMLData(data interface{}) (interface{}, error) {
 	// Example transformation: Add a key-value pair if the data is a map
 	if yamlMap, ok := data.(map[string]interface{}); ok {
@@ -138,6 +140,7 @@ func transformYAMLData(data interface{}) (interface{}, error) {
 	return data, nil
 }
 
+// Initialize the YAML integrations by registering them with the registry.
 func init() {
 	registry.RegisterSource("YAML", YAMLSource{})
 	registry.RegisterDestination("YAML", YAMLDestination{})
