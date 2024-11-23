@@ -72,17 +72,11 @@ func (r RabbitMQSource) FetchData(req interfaces.Request) (interface{}, error) {
 		// Transformation
 		transformedData := transformData(validatedData)
 
-		// Pass data to output
-		err = routeToOutput(transformedData, req)
-		if err != nil {
-			logger.Fatalf("Error routing data to output: %s", err)
-			continue
-		}
-
-		logger.Infof("Message successfully processed and routed: %s", transformedData)
+		logger.Infof("Message successfully processed: %s", transformedData)
+		return transformedData, nil
 	}
 
-	return nil, errors.New("no messages processed")
+	return transformData, errors.New("no messages processed")
 }
 
 // SendData connects to RabbitMQ and publishes data to the specified queue.
@@ -120,6 +114,17 @@ func (r RabbitMQDestination) SendData(data interface{}, req interfaces.Request) 
 		return err
 	}
 
+	// Convert the data to a byte slice if it's not already in that form
+	var messageBody []byte
+	switch v := data.(type) {
+	case string:
+		messageBody = []byte(v) // if data is already a string, convert it to a byte slice
+	case []byte:
+		messageBody = v // if data is already a byte slice, use it directly
+	default:
+		return errors.New("unsupported data type for RabbitMQ message")
+	}
+
 	// Publish the message
 	err = ch.Publish(
 		"",                          // exchange
@@ -128,14 +133,14 @@ func (r RabbitMQDestination) SendData(data interface{}, req interfaces.Request) 
 		false,                       // immediate
 		amqp.Publishing{
 			ContentType: "text/plain",
-			Body:        []byte(data.(string)), // Assumes data is a string; modify as needed
+			Body:        messageBody, // use the correctly formatted body
 		},
 	)
 	if err != nil {
 		return err
 	}
 
-	logger.Infof("Message sent to RabbitMQ queue %s: %s", req.RabbitMQOutputQueueName, data)
+	logger.Infof("Message sent to RabbitMQ queue %s: %s", req.RabbitMQOutputQueueName, string(messageBody))
 	return nil
 }
 
@@ -165,20 +170,4 @@ func transformData(data []byte) []byte {
 	// Example: Convert data to uppercase (modify as needed)
 	transformed := []byte(strings.ToUpper(string(data)))
 	return transformed
-}
-
-func routeToOutput(data []byte, req interfaces.Request) error {
-	logger.Infof("Routing data to output: %s", data)
-
-	outputHandler, exists := registry.GetDestination(req.Output)
-	if !exists {
-		return errors.New("invalid output destination")
-	}
-
-	if err := outputHandler.SendData(data, req); err != nil {
-		return errors.New("failed to send data to output")
-	}
-
-	logger.Infof("Data successfully routed to %s", req.Output)
-	return nil
 }
