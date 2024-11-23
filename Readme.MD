@@ -3,6 +3,7 @@
 **Fractal** is a flexible, configurable data processing tool built with **GoFr** and **Golang**. Fractal is designed to handle data ingestion from multiple sources, apply powerful transformations and validations, and deliver output to a wide range of destinations. With Fractal, you can automate complex data workflows without needing to manage low-level details.
 Here's the documentation for setting up a new integration in your project:
 
+## To Run RabbitMQ :  ```bash docker run -d --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3-management```
 
 # Adding a New Integration
 
@@ -68,6 +69,8 @@ The system is designed to make it simple to add new data integrations for both i
 
 
 With this setup, adding integrations is straightforward. Each integration can now be quickly defined and registered, keeping your system scalable and modular.
+
+
 
 ## Features
 - **Multi-Source Data Ingestion**: Supports data ingestion from HTTP, CSV files, SQL databases, Pub-Sub systems, cloud storage, and more.

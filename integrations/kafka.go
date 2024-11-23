@@ -3,6 +3,7 @@ package integrations
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/SkySingh04/fractal/interfaces"
@@ -59,16 +60,10 @@ func (k KafkaSource) FetchData(req interfaces.Request) (interface{}, error) {
 
 		// Transformation
 		transformedData := transformKafkaData(validatedData)
-
-		// Pass data to output
-		err = routeKafkaOutput(transformedData, req)
-		if err != nil {
-			logger.Fatalf("Error routing data to output: %s", err)
-			continue
-		}
-
-		logger.Infof("Message successfully processed and routed: %s", transformedData)
+		logger.Infof("Message successfully processed", transformedData)
+		return transformedData, nil
 	}
+
 }
 
 // SendData connects to Kafka and publishes data to the specified topic.
@@ -86,17 +81,28 @@ func (k KafkaDestination) SendData(data interface{}, req interfaces.Request) err
 	})
 	defer writer.Close()
 
+	// Convert data to a string
+	var message string
+	switch v := data.(type) {
+	case string:
+		message = v
+	case []byte:
+		message = string(v) // Convert bytes to a string
+	default:
+		return fmt.Errorf("unsupported data type: %T", v)
+	}
+
 	// Publish message
 	err := writer.WriteMessages(context.Background(),
 		kafka.Message{
-			Value: []byte(data.(string)), // Assumes data is a string; modify as needed
+			Value: []byte(message),
 		},
 	)
 	if err != nil {
 		return err
 	}
 
-	logger.Infof("Message sent to Kafka topic %s: %s", req.ProducerTopic, data)
+	logger.Infof("Message sent to Kafka topic %s: %s", req.ProducerTopic, message)
 	return nil
 }
 
@@ -126,20 +132,4 @@ func transformKafkaData(data []byte) []byte {
 	// Example: Convert data to uppercase (modify as needed)
 	transformed := []byte(strings.ToUpper(string(data)))
 	return transformed
-}
-
-func routeKafkaOutput(data []byte, req interfaces.Request) error {
-	logger.Infof("Routing data to output: %s", data)
-
-	outputHandler, exists := registry.GetDestination(req.Output)
-	if !exists {
-		return errors.New("invalid output destination")
-	}
-
-	if err := outputHandler.SendData(data, req); err != nil {
-		return errors.New("failed to send data to output")
-	}
-
-	logger.Infof("Data successfully routed to %s", req.Output)
-	return nil
 }
