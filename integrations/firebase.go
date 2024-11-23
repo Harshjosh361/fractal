@@ -36,9 +36,6 @@ func (f FirebaseSource) FetchData(req interfaces.Request) (interface{}, error) {
 	logger.Infof("Connecting to Firebase Source: Collection=%s, Document=%s, using Service Account=%s",
 		req.Collection, req.Document, req.CredentialFileAddr)
 
-	
-
-
 	// Initialize Firebase app with service account
 	opt := option.WithCredentialsFile(req.CredentialFileAddr)
 	app, err := firebase.NewApp(context.Background(), nil, opt)
@@ -83,8 +80,6 @@ func (f FirebaseSource) FetchData(req interfaces.Request) (interface{}, error) {
 // SendData connects to Firebase and writes data to the specified collection and document.
 func (f FirebaseDestination) SendData(data interface{}, req interfaces.Request) error {
 	logger.Infof("Writing data to Firebase database: Collection=%s, Document=%s", req.Collection, req.Document)
-
-	
 
 	// Initialize Firebase app with service account
 	opt := option.WithCredentialsFile(req.CredentialFileAddr)

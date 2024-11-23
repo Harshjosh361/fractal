@@ -168,7 +168,7 @@ func (m MongoDBDestination) SendData(data interface{}, req interfaces.Request) e
 	return nil
 }
 
-// Initialize the MongoDB integrations by registering them with the registry.
+// Initialize the MongoDB integrationfs by registering them with the registry.
 func init() {
 	registry.RegisterSource("MongoDB", MongoDBSource{})
 	registry.RegisterDestination("MongoDB", MongoDBDestination{})
