@@ -52,4 +52,7 @@ type Request struct {
 	SFTPPassword         string `json:"sftp_password"`          // SFTP password
 	WebSocketSourceURL   string `json:"websocket_source_url"`   // WebSocket source URL
 	WebSocketDestURL     string `json:"websocket_dest_url"`     // WebSocket destination URL
+	// Firebase
+	FirebaseURL string `json:"firebase_database_url"`
+	Credential  string `json:"firebase_credential_file"`
 }
