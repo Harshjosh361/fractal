@@ -1,6 +1,9 @@
 inputconfig:
-    filepath: input.yaml
-inputmethod: YAML
+    collection: sampledata
+    credentialfileaddr: firebaseConfig.json
+    document: "1"
+inputmethod: Firebase
 outputconfig:
-    filepath: hehe.yaml
-outputmethod: YAML
+    region: bla
+    tablename: new
+outputmethod: DynamoDB
