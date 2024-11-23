@@ -1,6 +1,10 @@
 inputconfig:
-    url: wss://echo.websocket.org
-inputmethod: WebSocket
+    collection: fyou
+    connstring: mongodb://localhost:27017/
+    database: test1
+inputmethod: MongoDB
 outputconfig:
-    url: wss://echo.websocket.org
-outputmethod: WebSocket
+    collection: abcd
+    connstring: mongodb://localhost:27017/
+    database: test2
+outputmethod: MongoDB
