@@ -2,5 +2,5 @@ inputconfig:
     csvsourcefilename: sample.csv
 inputmethod: CSV
 outputconfig:
-    csvdestinationfilename: samplecopy.csv
+    csvdestinationfilename: samplenew.csv
 outputmethod: CSV

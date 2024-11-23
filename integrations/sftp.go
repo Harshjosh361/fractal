@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/SkySingh04/fractal/interfaces"
@@ -30,7 +31,7 @@ type SFTPDestination struct {
 	SFTPFILEPATH string `json:"file_path"`
 }
 
-// FetchData fetches data from an SFTP server
+// FetchData fetches data from an SFTP server concurrently
 func (s SFTPSource) FetchData(req interfaces.Request) (interface{}, error) {
 	if err := validateSFTPRequest(req, true); err != nil {
 		return nil, err
@@ -43,23 +44,46 @@ func (s SFTPSource) FetchData(req interfaces.Request) (interface{}, error) {
 	}
 	defer client.Close()
 
-	logger.Infof("Downloading file from SFTP: %s", req.SFTPFILEPATH)
-	file, err := client.Open(req.SFTPFILEPATH)
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve file from SFTP: %w", err)
-	}
-	defer file.Close()
+	// Use WaitGroup to ensure all operations finish
+	var wg sync.WaitGroup
+	dataChan := make(chan []byte)
+	errorChan := make(chan error)
 
-	data, err := io.ReadAll(file)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read data from SFTP response: %w", err)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		logger.Infof("Downloading file from SFTP: %s", req.SFTPFILEPATH)
+		file, err := client.Open(req.SFTPFILEPATH)
+		if err != nil {
+			errorChan <- fmt.Errorf("failed to retrieve file from SFTP: %w", err)
+			return
+		}
+		defer file.Close()
+
+		data, err := io.ReadAll(file)
+		if err != nil {
+			errorChan <- fmt.Errorf("failed to read data from SFTP response: %w", err)
+			return
+		}
+
+		dataChan <- data
+	}()
+
+	// Wait for the goroutine to finish and check for errors
+	wg.Wait()
+	close(dataChan)
+	close(errorChan)
+
+	if len(errorChan) > 0 {
+		return nil, <-errorChan
 	}
 
-	logger.Infof("Successfully fetched data from SFTP.")
-	return data, nil
+	// Return the data received from the channel
+	return <-dataChan, nil
 }
 
-// SendData sends data to an SFTP server
+// SendData sends data to an SFTP server concurrently
 func (s SFTPDestination) SendData(data interface{}, req interfaces.Request) error {
 	if err := validateSFTPRequest(req, false); err != nil {
 		return err
@@ -72,21 +96,40 @@ func (s SFTPDestination) SendData(data interface{}, req interfaces.Request) erro
 	}
 	defer client.Close()
 
-	logger.Infof("Uploading file to SFTP: %s", req.SFTPFILEPATH)
+	// Use WaitGroup to ensure all operations finish
+	var wg sync.WaitGroup
+	errorChan := make(chan error)
+
 	dataBytes, ok := data.([]byte)
 	if !ok {
 		return fmt.Errorf("invalid data format; expected []byte, got %T", data)
 	}
 
-	file, err := client.Create(req.SFTPFILEPATH)
-	if err != nil {
-		return fmt.Errorf("failed to create file on SFTP server: %w", err)
-	}
-	defer file.Close()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
 
-	_, err = file.Write(dataBytes)
-	if err != nil {
-		return fmt.Errorf("failed to write file to SFTP server: %w", err)
+		logger.Infof("Uploading file to SFTP: %s", req.SFTPFILEPATH)
+		file, err := client.Create(req.SFTPFILEPATH)
+		if err != nil {
+			errorChan <- fmt.Errorf("failed to create file on SFTP server: %w", err)
+			return
+		}
+		defer file.Close()
+
+		_, err = file.Write(dataBytes)
+		if err != nil {
+			errorChan <- fmt.Errorf("failed to write file to SFTP server: %w", err)
+			return
+		}
+	}()
+
+	// Wait for the goroutine to finish and check for errors
+	wg.Wait()
+	close(errorChan)
+
+	if len(errorChan) > 0 {
+		return <-errorChan
 	}
 
 	logger.Infof("Successfully sent data to SFTP.")
