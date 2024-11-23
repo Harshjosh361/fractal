@@ -1,7 +1,8 @@
 inputconfig:
-    csvsourcefilename: sample.csv
-inputmethod: CSV
+    region: us-east
+    tablename: input
+inputmethod: DynamoDB
 outputconfig:
-    csvdestinationfilename: fghjk.csv
-outputmethod: CSV
-
+    region: us-east
+    tablename: output
+outputmethod: DynamoDB

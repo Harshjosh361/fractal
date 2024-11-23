@@ -35,7 +35,8 @@ func (d DynamoDBSource) FetchData(req interfaces.Request) (interface{}, error) {
 
 	// Create a DynamoDB session for the specified region
 	sess, err := session.NewSession(&aws.Config{
-		Region: aws.String(req.DynamoDBSourceRegion),
+		Region:   aws.String(req.DynamoDBSourceRegion),
+		Endpoint: aws.String("http://localhost:8000"), // Specify DynamoDB Local endpoint here
 	})
 	if err != nil {
 		return nil, err

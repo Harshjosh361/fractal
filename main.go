@@ -70,7 +70,7 @@ func main() {
 				}
 			}
 		}
-		// logger.Infof("Configuration loaded successfully: %+v", configuration)
+		logger.Infof("Configuration loaded successfully: %+v", configuration)
 		if _, ok := configuration["inputconfig"]; !ok {
 			logger.Fatalf("Missing 'inputconfig' in configuration")
 		}
@@ -157,8 +157,8 @@ func mapConfigToRequest(config map[string]interface{}) interfaces.Request {
 		JSONOutputData:          getStringField(config, "data", ""),
 		YAMLSourceFilePath:      getStringField(config, "filepath", ""),
 		YAMLDestinationFilePath: getStringField(config, "filepath", ""),
-		DynamoDBSourceTable:     getStringField(config, "table", ""),
-		DynamoDBTargetTable:     getStringField(config, "table", ""),
+		DynamoDBSourceTable:     getStringField(config, "tablename", ""),
+		DynamoDBTargetTable:     getStringField(config, "tablename", ""),
 		DynamoDBSourceRegion:    getStringField(config, "region", ""),
 		DynamoDBTargetRegion:    getStringField(config, "region", ""),
 		FTPURL:                  getStringField(config, "url", ""),
