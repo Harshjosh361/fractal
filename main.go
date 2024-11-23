@@ -6,6 +6,7 @@ import (
 	"github.com/SkySingh04/fractal/config"
 	"github.com/SkySingh04/fractal/controller"
 	_ "github.com/SkySingh04/fractal/integrations"
+	"github.com/SkySingh04/fractal/logger"
 	"gofr.dev/pkg/gofr"
 )
 
@@ -27,11 +28,11 @@ func main() {
 	// Ask if the user wants to start HTTP Server or use CLI
 	mode, err := config.AskForMode()
 	if err != nil {
-		app.Logger().Fatalf("Failed to select application mode: %v", err)
+		logger.Fatalf("Failed to select application mode: %v", err)
 	}
 
 	if mode == "Start HTTP Server" {
-		app.Logger().Infof("Starting HTTP Server... Welcome to the Fractal API!")
+		logger.Infof("Starting HTTP Server... Welcome to the Fractal API!")
 
 		// Register route greet
 		app.GET("/greet", func(ctx *gofr.Context) (interface{}, error) {
@@ -47,25 +48,25 @@ func main() {
 		// Load or set up the configuration interactively for CLI mode
 		configuration, err := config.LoadConfig("config.yaml")
 		if err != nil {
-			app.Logger().Logf("Config file not found. Let's set up the input and output methods.")
+			logger.Logf("Config file not found. Let's set up the input and output methods.")
 			configMap, err := config.SetupConfigInteractively()
 			if err != nil {
-				app.Logger().Fatalf("Failed to set up configuration: %v", err)
+				logger.Fatalf("Failed to set up configuration: %v", err)
 			}
 			configuration = make(map[string]string)
 			for key, value := range configMap {
 				if strValue, ok := value.(string); ok {
 					configuration[key] = strValue
 				} else {
-					app.Logger().Fatalf("Invalid configuration value for key %s: %v", key, value)
+					logger.Fatalf("Invalid configuration value for key %s: %v", key, value)
 				}
 			}
 			if err != nil {
-				app.Logger().Fatalf("Failed to set up configuration: %v", err)
+				logger.Fatalf("Failed to set up configuration: %v", err)
 			}
 		}
 
-		app.Logger().Infof("Configuration loaded successfully: %+v", configuration)
+		logger.Infof("Configuration loaded successfully: %+v", configuration)
 		// Here you can add further CLI-based data processing logic
 	}
 }
