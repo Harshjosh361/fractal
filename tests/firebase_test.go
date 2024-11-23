@@ -39,7 +39,7 @@ func (m *MockFirestoreDocument) Get(ctx context.Context) (map[string]interface{}
 	return args.Get(0).(map[string]interface{}), args.Error(1)
 }
 
-func TestFetchData(t *testing.T) {
+func TestFirebaseIntegration(t *testing.T) {
 
 	const (
 		GreenTick = "\033[32m✔\033[0m" // Green tick
