@@ -56,13 +56,18 @@ func main() {
 			if err != nil {
 				logger.Fatalf("Failed to set up configuration: %v", err)
 			}
-			configuration = make(map[string]interface{})
+			configuration := make(map[string]interface{})
 			for key, value := range configMap {
-				// if strValue, ok := value.(string); ok {
-				configuration[key] = value.(string)
-				// } else {
-				// 	logger.Fatalf("Invalid configuration value for key %s: %v", key, value)
-				// }
+				switch v := value.(type) {
+				case string:
+					configuration[key] = v
+				case map[string]interface{}:
+					logger.Logf("Key %s has a nested map value: %v", key, v)
+					configuration[key] = v
+				default:
+					logger.Logf("Key %s has a value of unhandled type %T: %v", key, v, v)
+					configuration[key] = v // Optionally handle other types here
+				}
 			}
 		}
 		// logger.Infof("Configuration loaded successfully: %+v", configuration)
@@ -146,6 +151,8 @@ func mapConfigToRequest(config map[string]interface{}) interfaces.Request {
 		TargetMongoDBDatabase:   getStringField(config, "database", ""),
 		TargetMongoDBCollection: getStringField(config, "collection", ""),
 		OutputFileName:          getStringField(config, "filename", ""),
+		CSVSourceFileName:       getStringField(config, "csvsourcefilename", ""),
+		CSVDestinationFileName:  getStringField(config, "csvdestinationfilename", ""),
 		JSONSourceData:          getStringField(config, "data", ""),
 		JSONOutputData:          getStringField(config, "data", ""),
 		YAMLSourceFilePath:      getStringField(config, "filepath", ""),

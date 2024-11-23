@@ -63,20 +63,20 @@ func (r RabbitMQSource) FetchData(req interfaces.Request) (interface{}, error) {
 		logger.Infof("Message received from RabbitMQ: %s", msg.Body)
 
 		// Validation
-		validatedData, err := validateData(msg.Body)
+		validatedData, err := validateRabbitMQData(msg.Body)
 		if err != nil {
 			logger.Fatalf("Validation failed for message: %s, Error: %s", msg.Body, err)
 			continue // Skip invalid message
 		}
 
 		// Transformation
-		transformedData := transformData(validatedData)
+		transformedData := transformRabbitMQData(validatedData)
 
 		logger.Infof("Message successfully processed: %s", transformedData)
 		return transformedData, nil
 	}
 
-	return transformData, errors.New("no messages processed")
+	return transformRabbitMQData, errors.New("no messages processed")
 }
 
 // SendData connects to RabbitMQ and publishes data to the specified queue.
@@ -150,8 +150,8 @@ func init() {
 	registry.RegisterDestination("RabbitMQ", RabbitMQDestination{})
 }
 
-// validateData ensures the input data meets the required criteria.
-func validateData(data []byte) ([]byte, error) {
+// validateRabbitMQData ensures the input data meets the required criteria.
+func validateRabbitMQData(data []byte) ([]byte, error) {
 	logger.Infof("Validating data: %s", data)
 
 	// Example: Check if data is non-empty
@@ -163,8 +163,8 @@ func validateData(data []byte) ([]byte, error) {
 	return data, nil
 }
 
-// transformData modifies the input data as per business logic.
-func transformData(data []byte) []byte {
+// transformRabbitMQData modifies the input data as per business logic.
+func transformRabbitMQData(data []byte) []byte {
 	logger.Infof("Transforming data: %s", data)
 
 	// Example: Convert data to uppercase (modify as needed)

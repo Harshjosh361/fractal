@@ -1,8 +1,6 @@
 inputconfig:
-    topic: my-topic
-    url: localhost:9092
-inputmethod: Kafka
+    csvsourcefilename: sample.csv
+inputmethod: CSV
 outputconfig:
-    topic: my-topic
-    url: localhost:9092
-outputmethod: Kafka
+    csvdestinationfilename: fghjk.csv
+outputmethod: CSV

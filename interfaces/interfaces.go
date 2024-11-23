@@ -36,6 +36,9 @@ type Request struct {
 	// YAML
 	YAMLSourceFilePath      string `json:"yaml_source_file_path"`      // Source YAML file path
 	YAMLDestinationFilePath string `json:"yaml_destination_file_path"` // Destination YAML file path
+	// CSV
+	CSVSourceFileName      string `json:"csv_source_file_name"`      // Source CSV file name
+	CSVDestinationFileName string `json:"csv_destination_file_name"` // Destination CSV file name
 	// Dynamodb
 	DynamoDBSourceTable  string `json:"dynamodb_source_table"`  // Source DynamoDB table
 	DynamoDBTargetTable  string `json:"dynamodb_target_table"`  // Target DynamoDB table
