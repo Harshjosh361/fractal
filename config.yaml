@@ -1,8 +1,10 @@
 inputconfig:
-    region: us-east-1
-    tablename: input
-inputmethod: DynamoDB
+    collection: sampledata
+    credentialfileaddr: firebaseConfig.json
+    document: "1"
+inputmethod: Firebase
 outputconfig:
-    region: us-east
-    tablename: newtable
-outputmethod: DynamoDB
+    collection: sampledata
+    credentialfileaddr: firebaseConfig.json
+    document: "2"
+outputmethod: Firebase
