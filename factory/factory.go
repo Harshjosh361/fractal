@@ -5,7 +5,6 @@ import (
 
 	"github.com/SkySingh04/fractal/interfaces"
 	"github.com/SkySingh04/fractal/registry"
-	
 )
 
 func CreateSource(name string) (interfaces.DataSource, error) {
