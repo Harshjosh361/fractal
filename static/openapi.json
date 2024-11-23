@@ -1,0 +1,97 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Fractal API",
+    "version": "1.0.0",
+    "description": "API documentation for the Fractal migration service"
+  },
+  "paths": {
+    "/migrate": {
+      "post": {
+        "summary": "Perform data migration",
+        "description": "This endpoint performs data migration from the source to the destination based on the provided configuration.",
+        "operationId": "postMigration",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "Input": {
+                    "type": "string",
+                    "description": "The input method for the migration (e.g., RabbitMQ, SQL, MongoDB)."
+                  },
+                  "Output": {
+                    "type": "string",
+                    "description": "The output method for the migration (e.g., RabbitMQ, SQL, MongoDB)."
+                  },
+                  "RabbitMQInputURL": {
+                    "type": "string",
+                    "description": "The URL of the RabbitMQ input queue."
+                  },
+                  "RabbitMQInputQueueName": {
+                    "type": "string",
+                    "description": "The name of the RabbitMQ input queue."
+                  },
+                  "RabbitMQOutputURL": {
+                    "type": "string",
+                    "description": "The URL of the RabbitMQ output queue."
+                  },
+                  "RabbitMQOutputQueueName": {
+                    "type": "string",
+                    "description": "The name of the RabbitMQ output queue."
+                  },
+                  "SQLSourceConnString": {
+                    "type": "string",
+                    "description": "The connection string for the source SQL database."
+                  },
+                  "SQLTargetConnString": {
+                    "type": "string",
+                    "description": "The connection string for the target SQL database."
+                  },
+                  "SourceMongoDBConnString": {
+                    "type": "string",
+                    "description": "The connection string for the source MongoDB."
+                  },
+                  "TargetMongoDBConnString": {
+                    "type": "string",
+                    "description": "The connection string for the target MongoDB."
+                  },
+                  "OutputFileName": {
+                    "type": "string",
+                    "description": "The output file name for storing migrated data."
+                  }
+                },
+                "required": ["Input", "Output"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Migration successful",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "success"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "error",
+                  "message": "Detailed error message here"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
