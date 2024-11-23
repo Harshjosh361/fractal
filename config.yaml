@@ -3,6 +3,6 @@ inputconfig:
     tablename: input
 inputmethod: DynamoDB
 outputconfig:
-    region: us-east-1
-    tablename: output
+    region: us-east
+    tablename: newtable
 outputmethod: DynamoDB

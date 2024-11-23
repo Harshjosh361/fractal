@@ -34,15 +34,13 @@ type FirebaseDestination struct {
 
 func (f FirebaseSource) FetchData(req interfaces.Request) (interface{}, error) {
 	logger.Infof("Connecting to Firebase Source: Collection=%s, Document=%s, using Service Account=%s",
-		f.Collection, f.Document, f.CredentialFileAddr)
+		req.Collection, req.Document, req.CredentialFileAddr)
 
-	// Validate configuration
-	if f.CredentialFileAddr == "" || f.Collection == "" || f.Document == "" {
-		return nil, errors.New("missing Firebase source configuration details")
-	}
+	
+
 
 	// Initialize Firebase app with service account
-	opt := option.WithCredentialsFile(f.CredentialFileAddr)
+	opt := option.WithCredentialsFile(req.CredentialFileAddr)
 	app, err := firebase.NewApp(context.Background(), nil, opt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize Firebase app: %w", err)
@@ -55,16 +53,14 @@ func (f FirebaseSource) FetchData(req interfaces.Request) (interface{}, error) {
 	}
 	defer client.Close()
 
-	// Fetch document
-	logger.Infof("Fetching data from Firestore: Collection=%s, Document=%s", f.Collection, f.Document)
-	dsnap, err := client.Collection(f.Collection).Doc(f.Document).Get(context.Background())
+	dsnap, err := client.Collection(req.Collection).Doc(req.Document).Get(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch document from Firestore: %w", err)
 	}
 
 	// Check if document exists
 	if !dsnap.Exists() {
-		return nil, fmt.Errorf("document not found in Firestore: Collection=%s, Document=%s", f.Collection, f.Document)
+		return nil, fmt.Errorf("document not found in Firestore: Collection=%s, Document=%s", req.Collection, req.Document)
 	}
 
 	data := dsnap.Data()
