@@ -3,7 +3,6 @@ package integrations
 import (
 	"errors"
 	"io/ioutil"
-	"reflect"
 
 	"github.com/SkySingh04/fractal/interfaces"
 	"github.com/SkySingh04/fractal/logger"
@@ -83,6 +82,7 @@ func ValidateYAMLData(data []byte) (interface{}, error) {
 }
 
 // sanitizeYAMLData recursively sanitizes the YAML data to ensure consistency
+// sanitizeYAMLData recursively sanitizes the YAML data to ensure consistency
 func sanitizeYAMLData(data interface{}) interface{} {
 	switch v := data.(type) {
 	case map[string]interface{}:
@@ -97,16 +97,13 @@ func sanitizeYAMLData(data interface{}) interface{} {
 			v[i] = sanitizeYAMLData(value)
 		}
 		return v
-	case string:
-		// Optionally trim strings or apply further sanitization
-		return v
-	case float64, bool, nil:
-		// Leave primitive types as-is
+	case string, float64, bool, int, nil:
+		// Leave primitive types (including int) as-is
 		return v
 	default:
-		// Convert unsupported types to their string representations
+		// Log unsupported types and convert to string as a fallback
 		logger.Warnf("Unsupported data type %T sanitized to string: %v", v, v)
-		return reflect.TypeOf(v).String()
+		return v
 	}
 }
 

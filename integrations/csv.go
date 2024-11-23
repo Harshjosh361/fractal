@@ -42,7 +42,7 @@ func WriteCSV(fileName string, data []byte) error {
 	defer file.Close()
 
 	writer := csv.NewWriter(file)
-	records := strings.Split(string(data), "\n")
+	records := strings.Split(strings.TrimSpace(string(data)), "\n") // Trim trailing newlines
 	for _, record := range records {
 		fields := strings.Split(record, ",")
 		err := writer.Write(fields)
@@ -51,7 +51,7 @@ func WriteCSV(fileName string, data []byte) error {
 		}
 	}
 	writer.Flush()
-	return nil
+	return writer.Error() // Ensure to check for flush errors
 }
 
 // CSVSource struct represents the configuration for consuming messages from CSV.
