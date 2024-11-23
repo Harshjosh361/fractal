@@ -88,9 +88,11 @@ func SetupConfigInteractively() (map[string]interface{}, error) {
 		"inputconfig":  inputconfig,
 		"outputconfig": outputconfig,
 	}
-
-	// Optionally save the config to a file for future runs
+	//TODO : FIX THIS BUG OF MISSING INPUT CONFIG IN CONFIGURATION
 	saveConfig(config)
+
+	//wait for 2
+	// time.Sleep(5 * time.Second)
 
 	return config, nil
 }

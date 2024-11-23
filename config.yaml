@@ -1,6 +1,6 @@
 inputconfig:
-    data: '{"akash" : "yay" }'
-inputmethod: JSON
+    filepath: input.yaml
+inputmethod: YAML
 outputconfig:
-    filename: hehe.json
-outputmethod: JSON
+    filepath: hehe.yaml
+outputmethod: YAML
