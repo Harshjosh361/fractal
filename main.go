@@ -93,8 +93,28 @@ func main() {
 		// Load configuration
 		configuration, err := config.LoadConfig("config.yaml")
 		if err != nil {
-			logger.Fatalf("Config file not found. Setup interactively: %v", err)
+			logger.Infof("Config file not found. Setup interactively: %v", err)
+			configMap, err := config.SetupConfigInteractively()
+			if err != nil {
+				logger.Fatalf("Failed to set up configuration : %v", err)
+			}
+
+			configuration = make(map[string]interface{})
+
+			for key, value := range configMap {
+				if strValue, ok := value.(string); ok {
+					configuration[key] = strValue
+				} else {
+					logger.Fatalf("Invalid value for key %s: %v", key, value)
+				}
+			}
+
+			if err != nil {
+				logger.Fatalf("Error creating the config file : %v", err)
+			}
+
 		}
+
 		logger.Infof("Configuration loaded: %+v", configuration)
 
 		// Define the task to be executed

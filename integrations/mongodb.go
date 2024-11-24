@@ -3,6 +3,7 @@ package integrations
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"sync"
 
@@ -124,8 +125,7 @@ func (m MongoDBDestination) SendData(data interface{}, req interfaces.Request) e
 	// Assert that data is a slice of bson.M
 	dataSlice, ok := data.([]bson.M)
 	if !ok {
-		logger.Errorf("data must be a slice of bson.M representing documents")
-		return errors.New("invalid data format: expected []bson.M")
+		dataSlice, _ = TransformDataToBSON(data)
 	}
 
 	// Buffered channel for sending documents
@@ -172,4 +172,21 @@ func (m MongoDBDestination) SendData(data interface{}, req interfaces.Request) e
 func init() {
 	registry.RegisterSource("MongoDB", MongoDBSource{})
 	registry.RegisterDestination("MongoDB", MongoDBDestination{})
+}
+
+func TransformDataToBSON(data interface{}) ([]bson.M, error) {
+	switch v := data.(type) {
+	case map[string]interface{}: // Single document
+		return []bson.M{v}, nil
+	case []map[string]interface{}: // Multiple documents
+		result := make([]bson.M, len(v))
+		for i, item := range v {
+			result[i] = item
+		}
+		return result, nil
+	case []bson.M: // Already in bson.M
+		return v, nil
+	default:
+		return nil, fmt.Errorf("unsupported data format: %T", v)
+	}
 }
