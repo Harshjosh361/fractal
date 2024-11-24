@@ -93,11 +93,12 @@ func main() {
 		// Load configuration
 		configuration, err := config.LoadConfig("config.yaml")
 		if err != nil {
+			
 			logger.Infof("Config file not found. Setup interactively: %v", err)
+
 			configMap, err := config.SetupConfigInteractively()
-			if err != nil {
-				logger.Fatalf("Failed to set up configuration : %v", err)
-			}
+
+			if err != nil { logger.Fatalf(`Failed to setup configuration interactively:`, err) }
 
 			configuration = make(map[string]interface{})
 
@@ -108,13 +109,10 @@ func main() {
 					logger.Fatalf("Invalid value for key %s: %v", key, value)
 				}
 			}
-
-			if err != nil {
-				logger.Fatalf("Error creating the config file : %v", err)
-			}
-
+			if err != nil { logger.Fatalf(`Failed to setup configuration interactively:`, err) }
+			
+			
 		}
-
 		logger.Infof("Configuration loaded: %+v", configuration)
 
 		// Define the task to be executed
@@ -229,8 +227,8 @@ func mapConfigToRequest(config map[string]interface{}) interfaces.Request {
 		SFTPPassword:            getStringField(config, "password", ""),
 		WebSocketSourceURL:      getStringField(config, "url", ""),
 		WebSocketDestURL:        getStringField(config, "url", ""),
-		CredentialFileAddr:      getStringField(config, "credentialfileaddr", ""),
-		Collection:              getStringField(config, "collection", ""),
-		Document:                getStringField(config, "document", ""),
+		CredentialFileAddr: 	getStringField(config, "credentialfileaddr", ""),
+		Collection: 		getStringField(config, "collection", ""),
+		Document: 		getStringField(config, "document", ""),
 	}
 }

@@ -5,10 +5,10 @@ inputconfig:
 inputmethod: Firebase
 outputconfig:
     collection: abcd
-    connstring: mongodb://localhost:27017/
+    connstring: mongodb+srv://dhruv:dhruv12345@cluster0.qslxm.mongodb.net/
     database: test1
 outputmethod: MongoDB
 transformations: |
-    ADD_FIELD("processed_at", '2004-10-22')
+    ADD_FIELD("processed_at", '2004-10-28')
 validations: |
     FIELD("age") RANGE(30, 35)
