@@ -156,23 +156,22 @@ The rules can be embedded into the YAML configuration for pipelines:
 
 ```yaml
 pipeline:
-  - name: "CSV to Firebase Pipeline"
-    input:
-      type: "CSV"
-      source: "/data/input.csv"
-    validation:
-      rules: |
-        FIELD("age") TYPE(INT) RANGE(18, 65)
-        FIELD("email") MATCHES(EMAIL_REGEX)
-    transformation:
-      rules: |
-        RENAME("old_field", "new_field")
-        IF FIELD("age") > 50 THEN ADD_FIELD("senior_discount", TRUE)
-    output:
-      type: "Firebase"
-      destination: "firebase://project_name/collection"
-    error_handling: |
-      ON_ERROR(LOG_AND_CONTINUE)
+  error-handling:
+   strategy: LOG_AND_CONTINUE
+inputconfig:
+   csvsourcefilename: sample.csv
+   inputmethod: CSV
+outputconfig:
+   csvdestinationfilename: test.csv
+   outputmethod: CSV
+cronjob:
+   repetition_interval: "1h"
+monitoring:
+   job_status:"pending"
+transformations:
+   -ADD_FIELD("processed_at", CURRENT_TIME())
+validations:
+   -FIELD("age") RANGE(30,35)
 ```
 
 ---
