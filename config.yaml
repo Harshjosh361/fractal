@@ -1,10 +1,14 @@
 inputconfig:
-    csvsourcefilename: sample.csv
-inputmethod: CSV
+    collection: sampledata
+    credentialfileaddr: firebaseConfig.json
+    document: "1"
+inputmethod: Firebase
 outputconfig:
-    csvdestinationfilename: samplenew.csv
-outputmethod: CSV
-cronjob:
-  cronexpression: "@every 5s"  # Every 5 seconds
-  jobname: "Data Fetch and Process"
-  task: "process_csv"
+    collection: abcd
+    connstring: mongodb://localhost:27017/
+    database: test1
+outputmethod: MongoDB
+transformations: |
+    ADD_FIELD("processed_at", '2004-10-22')
+validations: |
+    FIELD("age") RANGE(30, 35)

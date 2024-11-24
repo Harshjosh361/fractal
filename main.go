@@ -229,5 +229,8 @@ func mapConfigToRequest(config map[string]interface{}) interfaces.Request {
 		SFTPPassword:            getStringField(config, "password", ""),
 		WebSocketSourceURL:      getStringField(config, "url", ""),
 		WebSocketDestURL:        getStringField(config, "url", ""),
+		CredentialFileAddr:      getStringField(config, "credentialfileaddr", ""),
+		Collection:              getStringField(config, "collection", ""),
+		Document:                getStringField(config, "document", ""),
 	}
 }
