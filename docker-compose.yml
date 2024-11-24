@@ -1,37 +1,10 @@
-# version: '3'
-# services:
-#   ftp-server:
-#     image: stilliard/pure-ftpd
-#     environment:
-#       FTP_USER_NAME: testuser
-#       FTP_USER_PASS: testpass
-#       FTP_USER_HOME: /home/testuser
-#     ports:
-#       - "21:21"
-#       - "30000-30009:30000-30009"
-#     volumes:
-#       - ./ftp-data:/home/testuser  # Mounts the local directory to the container
-
 
 services:
-  jaeger:
-    image: jaegertracing/all-in-one:1.34
-    container_name: jaeger
-    environment:
-      - COLLECTOR_ZIPKIN_HTTP_PORT=9411
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
-      - "5775:5775"    # Jaeger agent
-      - "6831:6831/udp" # Jaeger agent (UDP)
-      - "6832:6832/udp" # Jaeger agent (UDP)
-      - "5778:5778"     # Jaeger UI (HTTP)
-      - "16686:16686"   # Jaeger UI
-      - "14250:14250"   # Jaeger Thrift HTTP
-      - "14268:14268"   # Jaeger Collector HTTP
-      - "9411:9411"     # Zipkin HTTP endpoint
-    networks:
-      - jaeger
-
-networks:
-  jaeger:
-    driver: bridge
-
+      - "8080:8080"
+    volumes:
+      - .:/app
