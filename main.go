@@ -1,13 +1,16 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"time"
 
 	"github.com/SkySingh04/fractal/config"
 	"github.com/SkySingh04/fractal/controller"
 	_ "github.com/SkySingh04/fractal/integrations"
 	"github.com/SkySingh04/fractal/interfaces"
 	"github.com/SkySingh04/fractal/logger"
+	"github.com/SkySingh04/fractal/opentele"
 	"github.com/SkySingh04/fractal/registry"
 	"gofr.dev/pkg/gofr"
 )
@@ -24,14 +27,47 @@ const (
 	`
 )
 
+func fetchData() ([]string, error) {
+	// Simulate data fetching logic (e.g., from an API or database)
+	fetchedData := []string{"Record 1", "Record 2", "Record 3"}
+	if time.Now().Minute()%2 == 0 {
+		return nil, fmt.Errorf("failed to fetch data")
+	}
+	return fetchedData, nil
+}
+
+func processData(data []string) ([]string, error) {
+	// Simulate data processing (e.g., transforming, filtering)
+	var processedData []string
+	for _, record := range data {
+		if record != "Record 2" {
+			processedData = append(processedData, record)
+		}
+	}
+	return processedData, nil
+}
+
 func main() {
+	// Initialize OpenTelemetry tracing
+	cleanup, err := opentele.InitTracing()
+	if err != nil {
+		logger.Fatalf("Failed to initialize OpenTelemetry: %v", err)
+	}
+	defer cleanup() // Ensure resources are flushed on exit
 	app := gofr.New()
 	fmt.Print(logo)
 
-	// Ask if the user wants to start HTTP Server or use CLI
+	// Ask for mode selection
 	mode, err := config.AskForMode()
 	if err != nil {
 		logger.Fatalf("Failed to select application mode: %v", err)
+	}
+	// Ask the user for the cron job repeat interval in seconds
+	var intervalSec int
+	fmt.Print("Enter the interval for cron job to repeat (in seconds): ")
+	_, err = fmt.Scanf("%d", &intervalSec)
+	if err != nil || intervalSec <= 0 {
+		logger.Fatalf("Invalid interval input. Please enter a positive integer: %v", err)
 	}
 
 	if mode == "Start HTTP Server" {
@@ -39,7 +75,12 @@ func main() {
 
 		// Register route greet
 		app.GET("/greet", func(ctx *gofr.Context) (interface{}, error) {
-			return "Hello World!", nil
+			// Start a span for this route
+			_, span := opentele.CreateSpan(ctx.Context, "HTTP GET /greet")
+			defer span.End()
+
+			// Perform the route logic
+			return "Hello Fractal!", nil
 		})
 
 		// Register other routes as necessary
@@ -48,9 +89,9 @@ func main() {
 		// Default port 8000
 		app.Run()
 	} else if mode == "Use CLI" {
-		// Load or set up the configuration interactively for CLI mode
+		// CLI Mode Logic
+		// Load configuration
 		configuration, err := config.LoadConfig("config.yaml")
-
 		if err != nil {
 			logger.Logf("Config file not found. Let's set up the input and output methods.")
 			configMap, err := config.SetupConfigInteractively()
@@ -80,6 +121,11 @@ func main() {
 			logger.Fatalf("Missing 'outputconfig' in configuration")
 		}
 
+		// logger.Infof("Configuration loaded successfully: %+v", configuration)
+
+		// Get the input and output methods from the configuration
+		inputMethod, inputconfig := configuration["inputMethod"], configuration["inputconfig"].(map[string]interface{})
+		outputMethod, outputconfig := configuration["outputMethod"], configuration["outputconfig"].(map[string]interface{})
 		if _, ok := configuration["errorhandling"]; !ok {
 
 			logger.Fatalf("Missing 'errorhandling' in configuration")
@@ -91,51 +137,71 @@ func main() {
 		if _, ok := configuration["transformations"]; !ok {
 			logger.Warnf("Missing 'transformations' in configuration")
 		}
+		// Define the task to be executed
+		task := func() {
+			// Create a root span for the entire task
+			ctx, span := opentele.CreateSpan(context.Background(), "cron-job")
+			defer span.End()
 
-		// logger.Infof("Configuration loaded successfully: %+v", configuration)
+			logger.Infof("Cron job triggered at: %s", time.Now().Format(time.RFC3339))
 
-		// Get the input and output methods from the configuration
-		inputMethod, inputconfig := configuration["inputMethod"], configuration["inputconfig"].(map[string]interface{})
-		inputconfig["validations"] = configuration["validations"]
-		inputconfig["transformations"] = configuration["transformations"]
-		inputconfig["errorhandling"] = configuration["errorhandling"]
-		outputMethod, outputconfig := configuration["outputMethod"], configuration["outputconfig"].(map[string]interface{})
 
 		// Fetch data from the input method
+		_, fetchSpan := opentele.CreateSpan(ctx, "fetch-data")
 		inputIntegration, found := registry.GetSource(inputMethod.(string))
 		if !found {
+			fetchSpan.RecordError(fmt.Errorf("input method %s not registered", inputMethod))
+			fetchSpan.End()
 			logger.Fatalf("Input method %s not registered", inputMethod)
+
 		}
 
 		// logger.Infof("Fetching data from %s...", inputMethod)
-		logger.Infof("Input configuration: %+v", inputconfig)
+		// logger.Infof("Input configuration: %+v", inputconfig)
 
 		inputRequest := mapConfigToRequest(inputconfig)
-		logger.Infof("Input request: %+v", inputRequest)
 		data, err := inputIntegration.FetchData(inputRequest)
 
 		if err != nil {
+			fetchSpan.RecordError(err)
+			fetchSpan.End()
 			logger.Fatalf("Failed to fetch data from %s: %v", inputMethod, err)
 		}
+		fetchSpan.End()
 
-		// logger.Infof("Data fetched from %s: %v", inputMethod, data)
+			// Send data to output integration
+			_, sendSpan := opentele.CreateSpan(ctx, "send-data")
+			outputIntegration, found := registry.GetDestination(outputMethod.(string))
+			if !found {
+				sendSpan.RecordError(fmt.Errorf("output method %s not registered", outputMethod))
+				sendSpan.End()
+				logger.Fatalf("Output method %s not registered", outputMethod)
+			}
+			outputRequest := mapConfigToRequest(outputconfig)
+			err = outputIntegration.SendData(data, outputRequest)
+			if err != nil {
+				sendSpan.RecordError(err)
+				sendSpan.End()
+				logger.Fatalf("Failed to send data to %s: %v", outputMethod, err)
+			}
+			sendSpan.End()
 
-		// Send data to the output method
-		outputIntegration, found := registry.GetDestination(outputMethod.(string))
-		if !found {
-			logger.Fatalf("Output method %s not registered", outputMethod)
+			logger.Infof("Data sent successfully")
 		}
 
-		logger.Infof("Sending data to %s...", outputMethod)
-		logger.Infof("Output configuration: %+v", outputconfig)
+		// Run the task immediately
+		task()
 
-		outputRequest := mapConfigToRequest(outputconfig)
-		err = outputIntegration.SendData(data, outputRequest)
-		if err != nil {
-			logger.Fatalf("Failed to send data to %s: %v", outputMethod, err)
+		// Repeat the task every interval
+		ticker := time.NewTicker(time.Duration(intervalSec) * time.Second) // Adjust the interval as needed
+		defer ticker.Stop()
+
+		// Infinite loop to keep executing the task every interval
+		for range ticker.C {
+			// Execute the task on each tick
+			task()
 		}
 
-		logger.Infof("Data sent to %s successfully", outputMethod)
 	}
 }
 
@@ -194,11 +260,9 @@ func mapConfigToRequest(config map[string]interface{}) interfaces.Request {
 		DynamoDBTargetTable:     getStringField(config, "tablename", ""),
 		DynamoDBSourceRegion:    getStringField(config, "region", ""),
 		DynamoDBTargetRegion:    getStringField(config, "region", ""),
-		FTPFILEPATH:             getStringField(config, "ftpfilepath", ""),
 		FTPURL:                  getStringField(config, "url", ""),
 		FTPUser:                 getStringField(config, "user", ""),
 		FTPPassword:             getStringField(config, "password", ""),
-		SFTPFILEPATH:            getStringField(config, "sftpfilepath", ""),
 		SFTPURL:                 getStringField(config, "url", ""),
 		SFTPUser:                getStringField(config, "user", ""),
 		SFTPPassword:            getStringField(config, "password", ""),

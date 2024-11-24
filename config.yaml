@@ -4,6 +4,12 @@ inputconfig:
     csvsourcefilename: sample.csv
 inputmethod: CSV
 outputconfig:
+    csvdestinationfilename: samplenew.csv
+outputmethod: CSV
+cronjob:
+  cronexpression: "@every 5s"  # Every 5 seconds
+  jobname: "Data Fetch and Process"
+  task: "process_csv"
     csvdestinationfilename: test.csv
 outputmethod: CSV
 transformations: |

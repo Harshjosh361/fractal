@@ -3,6 +3,7 @@ package integrations
 import (
 	"errors"
 	"strings"
+	"sync"
 
 	"github.com/SkySingh04/fractal/interfaces"
 	"github.com/SkySingh04/fractal/logger"
@@ -22,7 +23,7 @@ type RabbitMQDestination struct {
 	QueueName string `json:"rabbitmq_output_queue_name"`
 }
 
-// FetchData connects to RabbitMQ, retrieves data, and passes it through validation and transformation pipelines.
+// FetchData connects to RabbitMQ, retrieves data, and processes it concurrently.
 func (r RabbitMQSource) FetchData(req interfaces.Request) (interface{}, error) {
 	logger.Infof("Connecting to RabbitMQ Source: URL=%s, Queue=%s", req.RabbitMQInputURL, req.RabbitMQInputQueueName)
 
@@ -58,25 +59,31 @@ func (r RabbitMQSource) FetchData(req interfaces.Request) (interface{}, error) {
 		return nil, err
 	}
 
-	// Process messages
-	for msg := range msgs {
-		logger.Infof("Message received from RabbitMQ: %s", msg.Body)
+	// Use a buffered channel for processing messages
+	messageChannel := make(chan []byte, 10)
+	var wg sync.WaitGroup
 
-		// Validation
-		validatedData, err := validateRabbitMQData(msg.Body)
-		if err != nil {
-			logger.Fatalf("Validation failed for message: %s, Error: %s", msg.Body, err)
-			continue // Skip invalid message
-		}
-
-		// Transformation
-		transformedData := transformRabbitMQData(validatedData)
-
-		logger.Infof("Message successfully processed: %s", transformedData)
-		return transformedData, nil
+	// Start multiple goroutines for concurrent processing
+	for i := 0; i < 5; i++ { // Number of workers
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for message := range messageChannel {
+				processRabbitMQMessage(message)
+			}
+		}()
 	}
 
-	return transformRabbitMQData, errors.New("no messages processed")
+	// Read messages from RabbitMQ and send to the channel
+	go func() {
+		for msg := range msgs {
+			messageChannel <- msg.Body
+		}
+		close(messageChannel)
+	}()
+
+	wg.Wait()
+	return nil, nil // Return nil as we process messages asynchronously
 }
 
 // SendData connects to RabbitMQ and publishes data to the specified queue.
@@ -114,14 +121,9 @@ func (r RabbitMQDestination) SendData(data interface{}, req interfaces.Request) 
 		return err
 	}
 
-	// Convert the data to a byte slice if it's not already in that form
-	var messageBody []byte
-	switch v := data.(type) {
-	case string:
-		messageBody = []byte(v) // if data is already a string, convert it to a byte slice
-	case []byte:
-		messageBody = v // if data is already a byte slice, use it directly
-	default:
+	// Convert the data to a byte slice
+	messageBody, ok := data.([]byte)
+	if !ok {
 		return errors.New("unsupported data type for RabbitMQ message")
 	}
 
@@ -133,7 +135,7 @@ func (r RabbitMQDestination) SendData(data interface{}, req interfaces.Request) 
 		false,                       // immediate
 		amqp.Publishing{
 			ContentType: "text/plain",
-			Body:        messageBody, // use the correctly formatted body
+			Body:        messageBody,
 		},
 	)
 	if err != nil {
@@ -144,10 +146,21 @@ func (r RabbitMQDestination) SendData(data interface{}, req interfaces.Request) 
 	return nil
 }
 
-// Initialize the RabbitMQ integrations by registering them with the registry.
-func init() {
-	registry.RegisterSource("RabbitMQ", RabbitMQSource{})
-	registry.RegisterDestination("RabbitMQ", RabbitMQDestination{})
+// processRabbitMQMessage handles individual RabbitMQ messages.
+func processRabbitMQMessage(message []byte) {
+	logger.Infof("Processing RabbitMQ message: %s", message)
+
+	// Validation
+	validatedData, err := validateRabbitMQData(message)
+	if err != nil {
+		logger.Errorf("Validation failed: %s", err)
+		return
+	}
+
+	// Transformation
+	transformedData := transformRabbitMQData(validatedData)
+
+	logger.Infof("Message processed successfully: %s", transformedData)
 }
 
 // validateRabbitMQData ensures the input data meets the required criteria.
@@ -159,7 +172,6 @@ func validateRabbitMQData(data []byte) ([]byte, error) {
 		return nil, errors.New("data is empty")
 	}
 
-	// Add custom validation logic here
 	return data, nil
 }
 
@@ -167,7 +179,12 @@ func validateRabbitMQData(data []byte) ([]byte, error) {
 func transformRabbitMQData(data []byte) []byte {
 	logger.Infof("Transforming data: %s", data)
 
-	// Example: Convert data to uppercase (modify as needed)
-	transformed := []byte(strings.ToUpper(string(data)))
-	return transformed
+	// Example: Convert data to uppercase
+	return []byte(strings.ToUpper(string(data)))
+}
+
+// Initialize the RabbitMQ integrations by registering them with the registry.
+func init() {
+	registry.RegisterSource("RabbitMQ", RabbitMQSource{})
+	registry.RegisterDestination("RabbitMQ", RabbitMQDestination{})
 }

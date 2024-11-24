@@ -3,12 +3,12 @@ package integrations
 import (
 	"encoding/csv"
 	"errors"
-	"fmt"
+	"io"
 	"os"
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
+	"sync"
 
 	"github.com/SkySingh04/fractal/interfaces"
 	"github.com/SkySingh04/fractal/language"
@@ -48,7 +48,7 @@ func WriteCSV(fileName string, data []byte) error {
 	defer file.Close()
 
 	writer := csv.NewWriter(file)
-	records := strings.Split(strings.TrimSpace(string(data)), "\n")
+	records := strings.Split(strings.TrimSpace(string(data)), "\n") // Trim trailing newlines
 	for _, record := range records {
 		fields := strings.Split(record, ",")
 		err := writer.Write(fields)
@@ -57,7 +57,7 @@ func WriteCSV(fileName string, data []byte) error {
 		}
 	}
 	writer.Flush()
-	return nil
+	return writer.Error() // Ensure to check for flush errors
 }
 
 // CSVSource struct represents the configuration for consuming messages from CSV.
@@ -70,7 +70,7 @@ type CSVDestination struct {
 	CSVDestinationFileName string `json:"csv_destination_file_name"`
 }
 
-// FetchData connects to CSV, retrieves data, and passes it through validation and transformation pipelines.
+// FetchData connects to CSV, retrieves data, and processes it concurrently.
 func (r CSVSource) FetchData(req interfaces.Request) (interface{}, error) {
 	logger.Infof("Reading data from CSV Source: %s", req.CSVSourceFileName)
 
@@ -78,28 +78,69 @@ func (r CSVSource) FetchData(req interfaces.Request) (interface{}, error) {
 		return nil, errors.New("missing CSV source file name")
 	}
 
-	// Read data from CSV
-	data, err := ReadCSV(req.CSVSourceFileName)
-	if err != nil {
-		return nil, err
-	}
-	logger.Infof("request: %v", req)
+	// Create channels for processing pipeline
+	dataChan := make(chan string, bufferSize)
+	validChan := make(chan string, bufferSize)
+	transformedChan := make(chan string, bufferSize)
+	errChan := make(chan error, 1)
 
-	// Validate the data
-	validatedData, err := validateCSVData(data, req.ValidationRules)
-	if err != nil {
+	var wg sync.WaitGroup
+
+	// Start concurrent CSV reading
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := readCSVConcurrently(req.CSVSourceFileName, dataChan, errChan); err != nil {
+			errChan <- err
+		}
+		close(dataChan)
+	}()
+
+	// Start concurrent validation
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for data := range dataChan {
+			if validData, err := validateCSVData(data); err != nil {
+				errChan <- err
+			} else {
+				validChan <- validData
+			}
+		}
+		close(validChan)
+	}()
+
+	// Start concurrent transformation
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for validData := range validChan {
+			transformedChan <- transformCSVData(validData)
+		}
+		close(transformedChan)
+	}()
+
+	// Wait for all goroutines to finish
+	go func() {
+		wg.Wait()
+		close(errChan)
+	}()
+
+	// Collect results or errors
+	var results []string
+	for transformedData := range transformedChan {
+		results = append(results, transformedData)
+	}
+
+	// Check for errors
+	if err, ok := <-errChan; ok {
 		return nil, err
 	}
 
-	// Transform the data
-	transformedData, err := transformCSVData(validatedData, req.TransformationRules)
-	if err != nil {
-		return nil, err
-	}
-	return transformedData, nil
+	return strings.Join(results, "\n"), nil
 }
 
-// SendData connects to CSV and publishes data to the specified queue.
+// SendData writes data to a CSV file concurrently.
 func (r CSVDestination) SendData(data interface{}, req interfaces.Request) error {
 	logger.Infof("Writing data to CSV Destination: %s", req.CSVDestinationFileName)
 
@@ -107,27 +148,75 @@ func (r CSVDestination) SendData(data interface{}, req interfaces.Request) error
 		return errors.New("missing CSV destination file name")
 	}
 
-	// Write data to CSV
-	err := WriteCSV(req.CSVDestinationFileName, data.([]byte))
+	// Convert data to a slice of strings for writing
+	lines, ok := data.(string)
+	if !ok {
+		return errors.New("invalid data format for CSV destination")
+	}
+	records := strings.Split(lines, "\n")
+
+	// Write concurrently
+	errChan := make(chan error, 1)
+	go func() {
+		errChan <- writeCSVConcurrently(req.CSVDestinationFileName, records)
+	}()
+
+	// Check for errors
+	if err := <-errChan; err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// readCSVConcurrently reads the content of a CSV file and sends records to a channel.
+func readCSVConcurrently(fileName string, out chan<- string, errChan chan<- error) error {
+	file, err := os.Open(fileName)
 	if err != nil {
 		return err
+	}
+	defer file.Close()
+
+	reader := csv.NewReader(file)
+	for {
+		record, err := reader.Read()
+		if err != nil {
+			if errors.Is(err, os.ErrClosed) || errors.Is(err, io.EOF) {
+				break
+			}
+			errChan <- err
+			return err
+		}
+		out <- strings.Join(record, ",")
 	}
 	return nil
 }
 
-// Initialize the CSV integrations by registering them with the registry.
-func init() {
-	registry.RegisterSource("CSV", CSVSource{})
-	registry.RegisterDestination("CSV", CSVDestination{})
+// writeCSVConcurrently writes data records to a CSV file concurrently.
+func writeCSVConcurrently(fileName string, records []string) error {
+	file, err := os.Create(fileName)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	for _, record := range records {
+		if err := writer.Write(strings.Split(record, ",")); err != nil {
+			return err
+		}
+	}
+	writer.Flush()
+	return writer.Error()
 }
 
-// validateCSVData ensures the input data meets the required criteria using validation rules.
-func validateCSVData(data []byte, validationRules string) ([]byte, error) {
+// validateCSVData ensures the input data meets the required criteria.
+func validateCSVData(data string) (string, error) {
+	logger.Infof("Validating data: %s", data)
 
-	// logger.Infof("Validating data: %s", data)
-
-	if len(data) == 0 {
-		return nil, errors.New("data is empty")
+	// Example: Check if data is non-empty
+	if strings.TrimSpace(data) == "" {
+		return "", errors.New("data is empty")
 	}
 	logger.Infof("validationRules: %s", validationRules)
 
@@ -169,241 +258,16 @@ func validateCSVData(data []byte, validationRules string) ([]byte, error) {
 
 }
 
-// transformCSVData modifies the input data as per business logic using transformation rules.
-func transformCSVData(data []byte, transformationRules string) ([]byte, error) {
-	// logger.Infof("Transforming data: %s", data)
+// transformCSVData modifies the input data as per business logic.
+func transformCSVData(data string) string {
+	logger.Infof("Transforming data: %s", data)
 
-	// Initialize lexer and tokenize the transformation rules
-	lexer := language.NewLexer(transformationRules)
-	tokens, err := lexer.Tokenize(transformationRules)
-	if err != nil {
-		return nil, fmt.Errorf("failed to tokenize transformation rules: %v", err)
-	}
-
-	// Parse the tokens into an AST
-	parser := language.NewParser()
-	// var tokenValues []string
-	// for _, token := range tokens {
-	// 	tokenValues = append(tokenValues, token.Value)
-	// }
-	rulesAST, err := parser.ParseRules(tokens)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse transformation rules: %v", err)
-	}
-
-	// Apply transformation rules to data
-	var transformedRecords []string
-	records := strings.Split(strings.TrimSpace(string(data)), "\n")
-	for _, record := range records {
-		for _, ruleNode := range rulesAST.Children {
-			transformedRecord, err := applyTransformationRule(record, ruleNode)
-			if err != nil {
-				return nil, err
-			}
-			record = transformedRecord // Apply each rule sequentially
-		}
-		transformedRecords = append(transformedRecords, record)
-	}
-
-	return []byte(strings.Join(transformedRecords, "\n")), nil
+	// Example: Convert data to uppercase (modify as needed)
+	return strings.ToUpper(data)
 }
 
-// applyValidationRule processes a single record against a validation rule AST node.
-func applyValidationRule(record string, ruleNode *language.Node) error {
-	// Split the record into fields (assuming CSV format)
-	fields := strings.Split(record, ",")
-	fieldMap := map[string]string{}
-
-	// Map field names to their values based on index (assuming header order)
-	// READ the first line of the CSV file to get the headers
-	headers := strings.Split(fields[0], ",")
-	for i, header := range headers {
-		if i < len(fields) {
-			fieldMap[header] = strings.TrimSpace(fields[i])
-		}
-	}
-
-	// Evaluate the ruleNode recursively
-	logger.Infof("Evaluating rule: %s", ruleNode.Value)
-	if err := evaluateNode(ruleNode, fieldMap); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Recursive function to evaluate nodes
-func evaluateNode(node *language.Node, fieldMap map[string]string) error {
-	switch node.Type {
-	case language.TokenField:
-		return nil // This case is handled within expressions
-
-	case "EXPRESSION":
-		fieldNode := node.Children[0]
-		conditionNode := node.Children[1]
-		valueNode := node.Children[2]
-
-		fieldValue, exists := fieldMap[fieldNode.Value]
-		if !exists {
-			return fmt.Errorf("field %s not found", fieldNode.Value)
-		}
-
-		switch conditionNode.Value {
-		case "TYPE":
-			return evaluateTypeCondition(fieldValue, valueNode.Value)
-		case "RANGE":
-			return evaluateRangeCondition(fieldValue, valueNode.Children)
-		case "MATCHES":
-			return evaluateRegexCondition(fieldValue, valueNode.Value)
-		case "IN":
-			return evaluateInCondition(fieldValue, valueNode.Children)
-		case "REQUIRED":
-			return evaluateRequiredCondition(fieldValue)
-		default:
-			return fmt.Errorf("unsupported condition: %s", conditionNode.Value)
-		}
-
-	case language.TokenLogical:
-		return evaluateLogicalCondition(node, fieldMap)
-	}
-
-	return fmt.Errorf("unknown node type: %s", node.Type)
-}
-func evaluateTypeCondition(value, expectedType string) error {
-	switch expectedType {
-	case "STRING":
-		return nil // All values are strings by default
-	case "INT":
-		if _, err := strconv.Atoi(value); err != nil {
-			return fmt.Errorf("value '%s' is not an integer", value)
-		}
-	case "FLOAT":
-		if _, err := strconv.ParseFloat(value, 64); err != nil {
-			return fmt.Errorf("value '%s' is not a float", value)
-		}
-	case "BOOL":
-		if _, err := strconv.ParseBool(value); err != nil {
-			return fmt.Errorf("value '%s' is not a boolean", value)
-		}
-	case "DATE":
-		if _, err := time.Parse("2006-01-02", value); err != nil {
-			return fmt.Errorf("value '%s' is not a valid date", value)
-		}
-	default:
-		return fmt.Errorf("unknown type: %s", expectedType)
-	}
-	return nil
-}
-func evaluateRangeCondition(value string, rangeNodes []*language.Node) error {
-	val, err := strconv.ParseFloat(value, 64)
-	if err != nil {
-		return fmt.Errorf("value '%s' is not numeric", value)
-	}
-
-	min, err := strconv.ParseFloat(rangeNodes[0].Value, 64)
-	if err != nil {
-		return fmt.Errorf("invalid minimum range value: %v", err)
-	}
-	max, err := strconv.ParseFloat(rangeNodes[1].Value, 64)
-	if err != nil {
-		return fmt.Errorf("invalid maximum range value: %v", err)
-	}
-
-	if val < min || val > max {
-		return fmt.Errorf("value '%s' out of range (%f, %f)", value, min, max)
-	}
-	return nil
-}
-func evaluateRegexCondition(value, pattern string) error {
-	matched, err := regexp.MatchString(pattern, value)
-	if err != nil || !matched {
-		return fmt.Errorf("value '%s' does not match pattern", value)
-	}
-	return nil
-}
-func evaluateInCondition(value string, allowedValues []*language.Node) error {
-	for _, valNode := range allowedValues {
-		if value == valNode.Value {
-			return nil
-		}
-	}
-	return fmt.Errorf("value '%s' not in allowed list", value)
-}
-func evaluateRequiredCondition(value string) error {
-	if strings.TrimSpace(value) == "" {
-		return errors.New("field is required and cannot be empty")
-	}
-	return nil
-}
-
-func evaluateLogicalCondition(node *language.Node, fieldMap map[string]string) error {
-	leftErr := evaluateNode(node.Children[0], fieldMap)
-	rightErr := evaluateNode(node.Children[1], fieldMap)
-
-	switch node.Value {
-	case "AND":
-		if leftErr != nil || rightErr != nil {
-			return errors.New("AND condition failed")
-		}
-	case "OR":
-		if leftErr != nil && rightErr != nil {
-			return errors.New("OR condition failed")
-		}
-	case "NOT":
-		if leftErr == nil {
-			return errors.New("NOT condition failed")
-		}
-	default:
-		return fmt.Errorf("unknown logical operator: %s", node.Value)
-	}
-	return nil
-}
-
-// Evaluate individual condition (fieldValue compared to ruleValue)
-func evaluateCondition(fieldValue, operator, ruleValue string) error {
-	switch operator {
-	case "==":
-		if fieldValue != ruleValue {
-			return fmt.Errorf("expected %s, got %s", ruleValue, fieldValue)
-		}
-	case "!=":
-		if fieldValue == ruleValue {
-			return fmt.Errorf("field value should not be %s", ruleValue)
-		}
-	case ">":
-		fieldNum, err1 := strconv.ParseFloat(fieldValue, 64)
-		ruleNum, err2 := strconv.ParseFloat(ruleValue, 64)
-		if err1 != nil || err2 != nil || fieldNum <= ruleNum {
-			return fmt.Errorf("expected greater than %s, got %s", ruleValue, fieldValue)
-		}
-	case "<":
-		fieldNum, err1 := strconv.ParseFloat(fieldValue, 64)
-		ruleNum, err2 := strconv.ParseFloat(ruleValue, 64)
-		if err1 != nil || err2 != nil || fieldNum >= ruleNum {
-			return fmt.Errorf("expected less than %s, got %s", ruleValue, fieldValue)
-		}
-	case ">=":
-		fieldNum, err1 := strconv.ParseFloat(fieldValue, 64)
-		ruleNum, err2 := strconv.ParseFloat(ruleValue, 64)
-		if err1 != nil || err2 != nil || fieldNum < ruleNum {
-			return fmt.Errorf("expected greater than or equal to %s, got %s", ruleValue, fieldValue)
-		}
-	case "<=":
-		fieldNum, err1 := strconv.ParseFloat(fieldValue, 64)
-		ruleNum, err2 := strconv.ParseFloat(ruleValue, 64)
-		if err1 != nil || err2 != nil || fieldNum > ruleNum {
-			return fmt.Errorf("expected less than or equal to %s, got %s", ruleValue, fieldValue)
-		}
-
-	default:
-		return fmt.Errorf("unsupported operator %s", operator)
-	}
-	return nil
-}
-
-// applyTransformationRule processes a single record against a transformation rule AST node.
-func applyTransformationRule(record string, ruleNode *language.Node) (string, error) {
-	// Implementation details based on your business logic
-	// Transform the record using the information from ruleNode
-	return record, nil // Replace with actual transformation logic
+// Initialize the CSV integrations by registering them with the registry.
+func init() {
+	registry.RegisterSource("CSV", CSVSource{})
+	registry.RegisterDestination("CSV", CSVDestination{})
 }

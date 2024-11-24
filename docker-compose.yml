@@ -1,13 +1,10 @@
-version: '3'
+
 services:
-  ftp-server:
-    image: stilliard/pure-ftpd
-    environment:
-      FTP_USER_NAME: testuser
-      FTP_USER_PASS: testpass
-      FTP_USER_HOME: /home/testuser
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
-      - "21:21"
-      - "30000-30009:30000-30009"
+      - "8080:8080"
     volumes:
-      - ./ftp-data:/home/testuser  # Mounts the local directory to the container
+      - .:/app
