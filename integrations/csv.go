@@ -3,10 +3,9 @@ package integrations
 import (
 	"encoding/csv"
 	"errors"
+	"fmt"
 	"io"
 	"os"
-	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 
