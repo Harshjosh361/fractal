@@ -1,14 +1,7 @@
 inputconfig:
-    collection: sampledata
-    credentialfileaddr: firebaseConfig.json
-    document: "1"
-inputmethod: Firebase
+    url: sdfxghjuk
+inputmethod: WebSocket
 outputconfig:
-    collection: abcd
-    connstring: mongodb+srv://dhruv:dhruv12345@cluster0.qslxm.mongodb.net/
-    database: test1
-outputmethod: MongoDB
-transformations: |
-    ADD_FIELD("processed", TIMESTAMP())
-validations: |
-    FIELD("age") RANGE(30, 35)
+    topic: bfhtd
+    url: dfghjkl
+outputmethod: Kafka
