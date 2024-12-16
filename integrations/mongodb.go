@@ -3,6 +3,7 @@ package integrations
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"sync"
 
@@ -108,10 +109,11 @@ func (m MongoDBDestination) SendData(data interface{}, req interfaces.Request) e
 	}
 	logger.Infof("Connecting to MongoDB destination...")
 
+	// Initialize MongoDB client
 	clientOptions := options.Client().ApplyURI(req.TargetMongoDBConnString)
 	client, err := mongo.Connect(context.TODO(), clientOptions)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to connect to MongoDB: %w", err)
 	}
 	defer func() {
 		if err = client.Disconnect(context.TODO()); err != nil {
@@ -119,50 +121,34 @@ func (m MongoDBDestination) SendData(data interface{}, req interfaces.Request) e
 		}
 	}()
 
+	// Transform data to BSON
+	bsonData, err := TransformDataToBSON(data)
+	if err != nil {
+		return fmt.Errorf("data transformation failed: %w", err)
+	}
+
+	// Access database and collection
 	collection := client.Database(req.TargetMongoDBDatabase).Collection(req.TargetMongoDBCollection)
 
-	// Assert that data is a slice of bson.M
-	dataSlice, ok := data.([]bson.M)
-	if !ok {
-		logger.Errorf("data must be a slice of bson.M representing documents")
-		return errors.New("invalid data format: expected []bson.M")
-	}
-
-	// Buffered channel for sending documents
-	dataChannel := make(chan bson.M, bufferSize)
-	errorChannel := make(chan error, bufferSize)
-	var wg sync.WaitGroup
-
-	// Goroutines for worker pool
-	for i := 0; i < bufferSize; i++ { // Worker pool
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for doc := range dataChannel {
-				if _, err := collection.InsertOne(context.TODO(), doc); err != nil {
-					logger.Errorf("Error inserting into collection %s: %v", req.TargetMongoDBCollection, err)
-					errorChannel <- err
-				} else {
-					logger.Infof("Data sent to MongoDB target collection %s: %v", req.TargetMongoDBCollection, doc)
-				}
-			}
-		}()
-	}
-
-	// Feed data into the channel
-	go func() {
-		for _, doc := range dataSlice {
-			dataChannel <- doc
+	// Insert data into MongoDB
+	if len(bsonData) == 1 {
+		// Insert a single document
+		_, err = collection.InsertOne(context.TODO(), bsonData[0])
+		if err != nil {
+			return fmt.Errorf("failed to insert document: %w", err)
 		}
-		close(dataChannel)
-	}()
 
-	wg.Wait()
-	close(errorChannel)
-
-	// Check for errors in the error channel
-	if len(errorChannel) > 0 {
-		return errors.New("one or more errors occurred while inserting data")
+	} else {
+		// Insert multiple documents
+		docs := make([]interface{}, len(bsonData))
+		for i, doc := range bsonData {
+			docs[i] = doc
+		}
+		_, err = collection.InsertMany(context.TODO(), docs)
+		if err != nil {
+			return fmt.Errorf("failed to insert documents: %w", err)
+		}
+		logger.Infof("Successfully inserted %d documents into MongoDB collection %s", len(bsonData), req.TargetMongoDBCollection)
 	}
 
 	return nil
@@ -172,4 +158,21 @@ func (m MongoDBDestination) SendData(data interface{}, req interfaces.Request) e
 func init() {
 	registry.RegisterSource("MongoDB", MongoDBSource{})
 	registry.RegisterDestination("MongoDB", MongoDBDestination{})
+}
+
+func TransformDataToBSON(data interface{}) ([]bson.M, error) {
+	switch v := data.(type) {
+	case map[string]interface{}: // Single document
+		return []bson.M{v}, nil
+	case []map[string]interface{}: // Multiple documents
+		result := make([]bson.M, len(v))
+		for i, item := range v {
+			result[i] = item
+		}
+		return result, nil
+	case []bson.M: // Already in bson.M
+		return v, nil
+	default:
+		return nil, fmt.Errorf("unsupported data format: %T", v)
+	}
 }

@@ -1,16 +1,9 @@
 errorhandling:
     strategy: LOG_AND_CONTINUE
 inputconfig:
-    csvsourcefilename: sample.csv
-inputmethod: CSV
+    url: sdfxghjuk
+inputmethod: WebSocket
 outputconfig:
-    csvdestinationfilename: samplenew.csv
-outputmethod: CSV
-cronjob:
-  cronexpression: "@every 5s"  # Every 5 seconds
-  jobname: "Data Fetch and Process"
-  task: "process_csv"
-transformations: |
-    ADD_FIELD("processed_at", CURRENT_TIME())
-validations: |
-    FIELD("age") TYPE(INT) RANGE(30, 35)
+    topic: bfhtd
+    url: dfghjkl
+outputmethod: Kafka

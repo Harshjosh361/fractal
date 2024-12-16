@@ -155,28 +155,25 @@ Depending on the data source, fields can be named using:
 The rules can be embedded into the YAML configuration for pipelines:
 
 ```yaml
+pipeline:
+  error-handling:
+   strategy: LOG_AND_CONTINUE
 inputconfig:
-  url: wss://echo.websocket.org
-inputmethod: WebSocket
-
+   csvsourcefilename: sample.csv
+   inputmethod: CSV
 outputconfig:
-  url: wss://echo.websocket.org
-outputmethod: WebSocket
-
-validation:
-  rules: |
-    FIELD("message") REQUIRED
-    FIELD("timestamp") TYPE(INT) RANGE(1609459200, 1704067200)
-
-transformation:
-  rules: |
-    ADD_FIELD("processed_at", CURRENT_TIME())
-    IF FIELD("message") MATCHES("^hello") THEN RENAME("message", "greeting")
-    MAP("status", {"0": "inactive", "1": "active"})
-
-error_handling:
-  on_error: LOG_AND_CONTINUE
+   csvdestinationfilename: test.csv
+   outputmethod: CSV
+cronjob:
+   repetition_interval: "1h"
+monitoring:
+   job_status:"pending"
+transformations:
+   -ADD_FIELD("processed_at", CURRENT_TIME())
+validations:
+   -FIELD("age") RANGE(30,35)
 ```
+
 ---
 
 # Adding a New Integration
