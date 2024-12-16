@@ -306,8 +306,10 @@ go run main.go -config=config.yaml
 - **Content Syndication**: Ingest and format content from RSS feeds or APIs, and distribute it across platforms.
 - **Data Quality Checker**: Validate incoming data streams to ensure data quality before storing.
 
-## Contributing
-Contributions are welcome! Feel free to submit pull requests for new features, bug fixes, or documentation improvements.
+## Contributing  
+Contributions are welcome! Feel free to submit pull requests for new features, bug fixes, or documentation improvements.  
+
+For detailed guidelines on how to contribute, please refer to the [Contributing Guide](./CONTRIBUTING.md).  
 
 ## License
 This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
