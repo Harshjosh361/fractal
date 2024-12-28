@@ -2,3 +2,5 @@
 myenv/
 firebaseConfig.json
 tests/firebaseConfig.json   
+pbweb.json
+mongo.txt

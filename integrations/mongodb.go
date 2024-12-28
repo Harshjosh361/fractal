@@ -161,6 +161,7 @@ func init() {
 }
 
 func TransformDataToBSON(data interface{}) ([]bson.M, error) {
+	logger.Infof("Data received for BSON conversion insertion: %+v", data)
 	switch v := data.(type) {
 	case map[string]interface{}: // Single document
 		return []bson.M{v}, nil

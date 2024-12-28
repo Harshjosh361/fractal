@@ -1,9 +1,10 @@
 errorhandling:
     strategy: LOG_AND_CONTINUE
 inputconfig:
-    url: sdfxghjuk
-inputmethod: WebSocket
+    topic: dsfdgfh
+    url: sdfgbh
+inputmethod: Kafka
 outputconfig:
-    topic: bfhtd
-    url: dfghjkl
-outputmethod: Kafka
+    queuename: sfdgrfthgyj
+    url: sefrgdthfy
+outputmethod: RabbitMQ
