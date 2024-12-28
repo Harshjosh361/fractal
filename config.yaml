@@ -1,0 +1,8 @@
+inputconfig:
+    topic: dsfdgfh
+    url: sdfgbh
+inputmethod: Kafka
+outputconfig:
+    queuename: sfdgrfthgyj
+    url: sefrgdthfy
+outputmethod: RabbitMQ
