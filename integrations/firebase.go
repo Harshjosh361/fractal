@@ -3,13 +3,14 @@ package integrations
 import (
 	"context"
 	"encoding/json"
-	"errors"
+	_ "errors"
 	"fmt"
-	"strings"
+	_ "strings"
 	"sync"
 	"time"
 
 	firebase "firebase.google.com/go"
+	_ "google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 
 	"github.com/SkySingh04/fractal/interfaces"
@@ -30,8 +31,7 @@ type FirebaseDestination struct {
 }
 
 func (f FirebaseSource) FetchData(req interfaces.Request) (interface{}, error) {
-	logger.Infof("Connecting to Firebase Source: Collection=%s, Document=%s, using Service Account=%s",
-		req.Collection, req.Document, req.CredentialFileAddr)
+	logger.Infof("Connecting to Firebase Source: Collection=%s, using Service Account=%s", req.Collection, req.CredentialFileAddr)
 
 	opt := option.WithCredentialsFile(req.CredentialFileAddr)
 	app, err := firebase.NewApp(context.Background(), nil, opt)
@@ -45,41 +45,30 @@ func (f FirebaseSource) FetchData(req interfaces.Request) (interface{}, error) {
 	}
 	defer client.Close()
 
-	dataChan := make(chan map[string]interface{}, 1)
-	errChan := make(chan error, 1)
-	var wg sync.WaitGroup
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		dsnap, err := client.Collection(req.Collection).Doc(req.Document).Get(context.Background())
-		if err != nil {
-			errChan <- fmt.Errorf("failed to fetch document from Firestore: %w", err)
-			return
-		}
-
-		if !dsnap.Exists() {
-			errChan <- fmt.Errorf("document not found: Collection=%s, Document=%s", req.Collection, req.Document)
-			return
-		}
-
-		dataChan <- dsnap.Data()
-	}()
-
-	wg.Wait()
-	close(dataChan)
-	close(errChan)
-
-	select {
-	case data := <-dataChan:
-		validatedData, err := validateFirebaseData(data)
-		if err != nil {
-			return nil, err
-		}
-		return transformFirebaseData(validatedData), nil
-	case err := <-errChan:
-		return nil, err
+	docs, err := client.Collection(req.Collection).Documents(context.Background()).GetAll()
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch documents: %w", err)
 	}
+
+	logger.Infof("Fetched documents from Firebase: %d documents", len(docs))
+	for i, doc := range docs {
+		logger.Infof("Document %d ID: %s, Data: %v", i, doc.Ref.ID, doc.Data())
+	}
+
+	var allData []map[string]interface{}
+	for _, doc := range docs {
+		data := doc.Data() 
+		logger.Infof("Fetched data from Firebase: %v", data)
+
+		data["_id"] = doc.Ref.ID
+
+		validatedData := data            
+		transformedData := validatedData 
+
+		allData = append(allData, transformedData)
+	}
+
+	return allData, nil
 }
 
 func (f FirebaseDestination) SendData(data interface{}, req interfaces.Request) error {
@@ -127,6 +116,8 @@ func (f FirebaseDestination) SendData(data interface{}, req interfaces.Request) 
 }
 
 func convertToMap(data interface{}, result *map[string]interface{}) error {
+	logger.Infof("Firebase data to map: %v", data)
+
 	temp, err := json.Marshal(data)
 	if err != nil {
 		return fmt.Errorf("failed to marshal data to JSON: %w", err)
@@ -140,18 +131,18 @@ func convertToMap(data interface{}, result *map[string]interface{}) error {
 
 func validateFirebaseData(data map[string]interface{}) (map[string]interface{}, error) {
 	logger.Infof("Validating Firebase data: %v", data)
-	message, ok := data["data"].(string)
-	if !ok || strings.TrimSpace(message) == "" {
-		return nil, errors.New("invalid or missing 'data' field")
-	}
+	// // message, ok := data;
+	// if !ok || strings.TrimSpace(message) == "" {
+	// 	return nil, errors.New("invalid or missing 'data' field")
+	// }
 	return data, nil
 }
 
 func transformFirebaseData(data map[string]interface{}) map[string]interface{} {
 	logger.Infof("Transforming Firebase data: %v", data)
-	if message, ok := data["data"].(string); ok {
-		data["data"] = strings.ToUpper(message)
-	}
+	// if message, ok := data["data"].(string); ok {
+	// 	data["data"] = strings.ToUpper(message)
+	// }
 	data["processed"] = time.Now().Format(time.RFC3339)
 	return data
 }

@@ -1,7 +1,0 @@
-inputconfig:
-    url: sdfxghjuk
-inputmethod: WebSocket
-outputconfig:
-    topic: bfhtd
-    url: dfghjkl
-outputmethod: Kafka
